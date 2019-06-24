@@ -82,6 +82,6 @@ struct m2s_sysreg {
  * known way (as of yet) to read them in run time. Hence,
  * we define them as build-time constants
  */
-#define CONFIG_SYS_M2S_SYSREF		142000000
+#define CONFIG_SYS_M2S_SYSREF		100000000
 
 #endif	/*_MACH_M2S_H_ */
