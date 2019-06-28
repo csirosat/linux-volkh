@@ -29,11 +29,13 @@
 #define PLATFORM_M2S_SOM		1
 #define PLATFORM_SF2_DEV_KIT		2
 #define PLATFORM_M2S_FG484_SOM		3
+#define PLATFORM_M2S_VOLKH		4
 
 extern int m2s_platform_get(void);
 
 #define DEVICE_M2S_120		0
 #define DEVICE_M2S_050		1
+#define DEVICE_M2S_060		2
 
 extern int m2s_device_get(void);
 

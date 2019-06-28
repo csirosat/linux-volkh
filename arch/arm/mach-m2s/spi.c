@@ -141,7 +141,8 @@ void __init m2s_spi_init(void)
 	 */
 #if defined(CONFIG_M2S_MSS_SPI0) || defined(CONFIG_M2S_MSS_SPI1)
 
-	if (p == PLATFORM_M2S_SOM || p == PLATFORM_M2S_FG484_SOM) {
+	if (p == PLATFORM_M2S_SOM || p == PLATFORM_M2S_FG484_SOM
+			                  || p == PLATFORM_M2S_VOLKH) {
 
 #if defined(CONFIG_M2S_MSS_SPI0) && defined(CONFIG_MTD_M25P80)
 		/*
@@ -176,6 +177,11 @@ void __init m2s_spi_init(void)
 			.nr_parts = ARRAY_SIZE(m2s_som_sf_mtd),
 			.type = "s25fl129p1",
 		};
+
+		if (p == PLATFORM_M2S_VOLKH) {
+			m2s_som_sf_data.name = "n25q512ax3";
+			m2s_som_sf_data.type = "n25q512ax3";
+		}
 
 #endif
 
@@ -266,7 +272,7 @@ void __init m2s_spi_init(void)
 		 */
 		{
 			.modalias = "m25p32",
-			.max_speed_hz = CONFIG_SYS_M2S_SYSREF/4,
+			.max_speed_hz = 25000000,
 			.bus_num = 0,
 			.chip_select = 0,
 			.platform_data = &m2s_som_sf_data,
@@ -355,7 +361,7 @@ void __init m2s_spi_init(void)
 
 		static struct spi_board_info sf2_dev_kit_sf_inf = {
 			.modalias = "m25p32",
-			.max_speed_hz = CONFIG_SYS_M2S_SYSREF/4,
+			.max_speed_hz = 25000000,
 			.bus_num = 0,
 			.chip_select = 0,
 			.platform_data = &sf2_dev_kit_sf_data,
