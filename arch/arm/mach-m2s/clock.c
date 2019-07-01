@@ -76,8 +76,6 @@ static void clock_mss_learn(void)
 {
 	unsigned int r1 = M2S_SYSREG->mssddr_facc1_cr;
 
-//	m2s_clock_pclk0 = CONFIG_SYS_M2S_SYSREF / clock_mss_divisor(r1, 2);
-//	m2s_clock_pclk1 = CONFIG_SYS_M2S_SYSREF / clock_mss_divisor(r1, 5);
 	m2s_clock_pclk0 = m2s_clock_sysref / clock_mss_divisor(r1, 2);
 	m2s_clock_pclk1 = m2s_clock_sysref / clock_mss_divisor(r1, 5);
 }
@@ -107,7 +105,6 @@ unsigned int m2s_clock_get(enum m2s_clock clck)
 		val = m2s_clock_pclk1;
 		break;
 	case CLCK_SYSREF:
-//		val = CONFIG_SYS_M2S_SYSREF;
 		val = m2s_clock_sysref;
 		break;
 	}

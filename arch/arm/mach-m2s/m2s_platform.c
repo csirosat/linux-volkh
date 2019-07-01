@@ -64,11 +64,11 @@ int m2s_device_get(void)
 	int r;
 
 	switch (m2s_platform) {
+	case PLATFORM_M2S_FG484_SOM:
 	case PLATFORM_M2S_VOLKH:
 		r = DEVICE_M2S_060;
 		break;
 	case PLATFORM_M2S_SOM:
-	case PLATFORM_M2S_FG484_SOM:
 	case PLATFORM_G4M_VB:
 	case PLATFORM_SF2_DEV_KIT:
 	default:
@@ -84,6 +84,10 @@ EXPORT_SYMBOL(m2s_device_get);
  */
 static int __init m2s_platform_parse(char *s)
 {
+	/*
+	 * Should really have a cmdline arg from u-boot for this
+	 * but fixed by platform should suffice for now.
+	 */
 	m2s_clock_sysref = 142000000; // default
 
 	if (!strcmp(s, "g4m-vb"))
@@ -92,14 +96,12 @@ static int __init m2s_platform_parse(char *s)
 		m2s_platform = PLATFORM_M2S_SOM;
 	else if (!strcmp(s, "sf2-dev-kit"))
 		m2s_platform = PLATFORM_SF2_DEV_KIT;
-	else if (!strcmp(s, "m2s-fg484-som"))
+	else if (!strcmp(s, "m2s-fg484-som")) {
 		m2s_platform = PLATFORM_M2S_FG484_SOM;
+		m2s_clock_sysref = 100000000;
+	}
 	else if (!strcmp(s, "m2s-volkh")) {
 		m2s_platform = PLATFORM_M2S_VOLKH;
-		/*
-		 * Should really have a cmdline arg from u-boot for this
-		 * but fixed by platform should suffice for now.
-		 */
 		m2s_clock_sysref = 100000000;
 	}
 
