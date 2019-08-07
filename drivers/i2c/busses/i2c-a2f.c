@@ -733,7 +733,7 @@ static int __devexit i2c_a2f_remove(struct platform_device *dev)
 /*
  * Driver data structure
  */
-static struct platform_driver i2c_a2f_drv = {
+static struct platform_driver i2c_a2f_driver = {
 	.probe	= i2c_a2f_probe,
 	.remove	= __devexit_p(i2c_a2f_remove),
 	.driver = {
@@ -749,9 +749,9 @@ static int __init i2c_a2f_module_init(void)
 {
 	int ret;
 	
-	ret = platform_driver_register(&i2c_a2f_drv);
+	ret = platform_driver_register(&i2c_a2f_driver);
 
-	d_printk(1, "drv=%s,ret=%d\n", i2c_a2f_drv.driver.name, ret);
+	d_printk(1, "drv=%s,ret=%d\n", i2c_a2f_driver.driver.name, ret);
 	return ret;
 }
 
@@ -760,9 +760,9 @@ static int __init i2c_a2f_module_init(void)
  */
 static void __exit i2c_a2f_module_exit(void)
 {
-	platform_driver_unregister(&i2c_a2f_drv);
+	platform_driver_unregister(&i2c_a2f_driver);
 
-	d_printk(1, "drv=%s\n", i2c_a2f_drv.driver.name);
+	d_printk(1, "drv=%s\n", i2c_a2f_driver.driver.name);
 }
 
 module_init(i2c_a2f_module_init);
