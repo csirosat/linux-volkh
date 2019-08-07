@@ -270,7 +270,7 @@ static int mmc_switch_hs(struct mmc_card *card)
 	}
 
 	for (i = 0; i < 9; i++) {
-		err = mmc_sd_switch(card, 0, 0, 1, status);
+		err = mmc_sd_switch(card, 1, 0, 1, status);
 		if (err != -EBUSY)
 			break;
 	}
