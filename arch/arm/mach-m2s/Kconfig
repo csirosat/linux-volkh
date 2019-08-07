@@ -52,7 +52,6 @@ config M2S_MSS_SPI1
 	help
 	  Include support for the MSS SPI1 port
 
-
 config M2S_MSS_I2C0
 	depends on ARCH_M2S && I2C_A2F
 	bool "Enable MSS I2C0 port"
@@ -90,7 +89,6 @@ config M2S_MSS_GPIO_INT
 	help
 	  Include support for the MSS GPIOs interrupt
 
-
 config M2S_FPGA_GPIO
 	depends on ARCH_M2S
 	select GPIOLIB
@@ -105,6 +103,13 @@ config M2S_FPGA_GPIO_ADDR
 	default "0x30000000"
 	help
 	  Specify base address of SmartFusion2 Core GPIO block
+
+config M2S_MMC_IWAVE
+	depends on ARCH_M2S && MMC_SDHCI_IWAVE
+	bool "Enable iWave Systems MMC/SDHCI IP core"
+	default y
+	help
+	  Include support for iWave Systems MMC/SDHCI IP core 
 
 endmenu
 
