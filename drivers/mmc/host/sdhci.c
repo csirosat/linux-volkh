@@ -794,13 +794,13 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_data *data)
 	sdhci_writew(host, data->blocks, SDHCI_BLOCK_COUNT);
 }
 
-static void sdhci_set_transfer_mode(struct sdhci_host *host,
+static u16 sdhci_set_transfer_mode(struct sdhci_host *host,
 	struct mmc_data *data)
 {
 	u16 mode;
 
 	if (data == NULL)
-		return;
+		return 0;
 
 	WARN_ON(!host->data);
 
@@ -812,7 +812,11 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
 	if (host->flags & SDHCI_REQ_USE_DMA)
 		mode |= SDHCI_TRNS_DMA;
 
-	sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
+	/* If atomic write quirk is NOT enabled, write the register here. */
+	if (!(host->quirks & SDHCI_QUIRK_ATOMIC_XFER_MODE_CMD_REGS))
+		sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
+
+	return mode;
 }
 
 static void sdhci_finish_data(struct sdhci_host *host)
@@ -866,6 +870,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	int flags;
 	u32 mask;
 	unsigned long timeout;
+	u16 xfer_mode;
 
 	WARN_ON(host->cmd);
 
@@ -902,7 +907,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 
 	sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
 
-	sdhci_set_transfer_mode(host, cmd->data);
+	xfer_mode = sdhci_set_transfer_mode(host, cmd->data);
 
 	if ((cmd->flags & MMC_RSP_136) && (cmd->flags & MMC_RSP_BUSY)) {
 		printk(KERN_ERR "%s: Unsupported response type!\n",
@@ -928,7 +933,13 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	if (cmd->data)
 		flags |= SDHCI_CMD_DATA;
 
-	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+	if (host->quirks & SDHCI_QUIRK_ATOMIC_XFER_MODE_CMD_REGS) {
+		/* Transfer Mode & Command Registers written together */
+		sdhci_writel(host, (SDHCI_MAKE_CMD(cmd->opcode, flags) << 16)
+						   | xfer_mode, SDHCI_TRANSFER_MODE);
+	} else {
+		sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+	}
 }
 
 static void sdhci_finish_command(struct sdhci_host *host)
@@ -988,9 +999,8 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 		if ((host->max_clk / div) <= clock)
 			break;
 	}
-	div >>= 1;
 
-	clk = div << SDHCI_DIVIDER_SHIFT;
+	clk = (div>>1) << SDHCI_DIVIDER_SHIFT;
 	clk |= SDHCI_CLOCK_INT_EN;
 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 
