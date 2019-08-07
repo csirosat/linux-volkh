@@ -160,6 +160,14 @@ config ESDHC_DETECT_USE_EXTERN_IRQ1
 
 endchoice
 
+config MMC_SDHCI_IWAVE
+	tristate "SDHCI support for iWave Systems SD/MMC 2.0 Host Controller on M2S"
+	depends on MMC_SDHCI && ARCH_M2S
+	select MMC_SDHCI_IO_ACCESSORS
+	help
+	  Enable support for iWave Systems Secure Digital Host Controller Interface
+	  (SDHCI) version 2.0 IP Core on Microsemi SmartFusion2.
+
 config MMC_SDHCI_S3C
 	tristate "SDHCI support on Samsung S3C SoC"
 	depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX)
