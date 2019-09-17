@@ -171,24 +171,21 @@ static int __devinit sdhci_iwave_probe(struct platform_device *pdev)
 
 	/* Setup quirks for the controller */
 
-	/* Currently with ADMA enabled we are getting some length
-	 * interrupts that are not being dealt with, do disable
-	 * ADMA until this is sorted out. */
-	host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
-	host->quirks |= SDHCI_QUIRK_32BIT_ADMA_SIZE;
-
-	/* we currently see overruns on errors, so disable the SDMA
-	 * support as well. */
+	/* SDMA not supported on this controller */
 	host->quirks |= SDHCI_QUIRK_BROKEN_DMA;
 
-	host->quirks |= (SDHCI_QUIRK_32BIT_DMA_ADDR |
-			 SDHCI_QUIRK_32BIT_DMA_SIZE);
+	/* ADMA is supported, but use 32-bit minimum quanta for now */
+	host->quirks |= SDHCI_QUIRK_32BIT_ADMA_SIZE;
 
-	/* Required! */
+	/* Use sequenced VDD and power enable */
 	host->quirks |= SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER;
 
-	/* Required! */
+	/* Transfer Mode and Command registers must be written
+	 * atomically due to 32-bit register access requirement */
 	host->quirks |= SDHCI_QUIRK_ATOMIC_XFER_MODE_CMD_REGS;
+
+	/* Soft IP controller currently has WP bit inverted */
+	host->quirks |= SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
 
 	ret = sdhci_add_host(host);
 	if (ret) {
