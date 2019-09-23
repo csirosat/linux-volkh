@@ -219,13 +219,12 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		}
 	}
 
+	/*
+	 * The EXT_CSD format is meant to be forward compatible. As long
+	 * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
+	 * are authorized, see JEDEC JESD84-B50 section B.8.
+	 */
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
-	if (card->ext_csd.rev > 5) {
-		printk(KERN_ERR "%s: unrecognised EXT_CSD revision %d\n",
-			mmc_hostname(card->host), card->ext_csd.rev);
-		err = -EINVAL;
-		goto out;
-	}
 
 	if (card->ext_csd.rev >= 2) {
 		card->ext_csd.sectors =
