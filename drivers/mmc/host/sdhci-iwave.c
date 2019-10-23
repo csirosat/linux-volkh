@@ -184,9 +184,6 @@ static int __devinit sdhci_iwave_probe(struct platform_device *pdev)
 	 * atomically due to 32-bit register access requirement */
 	host->quirks |= SDHCI_QUIRK_ATOMIC_XFER_MODE_CMD_REGS;
 
-	/* Soft IP controller currently has WP bit inverted */
-	host->quirks |= SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
-
 	ret = sdhci_add_host(host);
 	if (ret) {
 		dev_err(dev, "sdhci_add_host() failed\n");

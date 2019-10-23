@@ -31,13 +31,19 @@
 /*
  * SDHCI IWAVE resources
  */
+
 #define MMC_IWAVE_START	0x30000000
 #define MMC_IWAVE_END	0x300000FF
 #define MMC_IWAVE_IRQ	34
 
+#define SD_IWAVE_START	0x30001000
+#define SD_IWAVE_END	0x300010FF
+#define SD_IWAVE_IRQ	35
+
 /*
- * MMC platform device resources
+ * MMC/SD platform device resources
  */
+
 static struct resource	mmc_iwave_resources[] = {
 	{
 		.start	= MMC_IWAVE_START,
@@ -50,22 +56,48 @@ static struct resource	mmc_iwave_resources[] = {
 	}
 };
 
+static struct resource	sd_iwave_resources[] = {
+	{
+		.start	= SD_IWAVE_START,
+		.end	= SD_IWAVE_END,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= SD_IWAVE_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	}
+};
+
 /*
- * MMC platform device data
+ * MMC/SD platform device data
  */
+
 static struct sdhci_iwave_platdata	mmc_iwave_platdata = {
 	.hw_name	= "m2s-mmc",
 };
 
+static struct sdhci_iwave_platdata	sd_iwave_platdata = {
+	.hw_name	= "m2s-sd",
+};
+
 /*
- * MMC platform device instance
+ * MMC/SD platform device instance
  */
+
 static struct platform_device	mmc_iwave_dev = {
 	.name			= "sdhci-iwave",
 	.id				= 0,
 	.num_resources	= ARRAY_SIZE(mmc_iwave_resources),
 	.resource		= mmc_iwave_resources,
 };
+
+static struct platform_device	sd_iwave_dev = {
+	.name			= "sdhci-iwave",
+	.id				= 1,
+	.num_resources	= ARRAY_SIZE(sd_iwave_resources),
+	.resource		= sd_iwave_resources,
+};
+
 #endif /* CONFIG_MMC_SDHCI_IWAVE */
 
 void __init m2s_mmc_init(void)
@@ -73,5 +105,8 @@ void __init m2s_mmc_init(void)
 #if defined(CONFIG_MMC_SDHCI_IWAVE)
 	mmc_iwave_dev.dev.platform_data = &mmc_iwave_platdata;
 	platform_device_register(&mmc_iwave_dev);
+
+	sd_iwave_dev.dev.platform_data = &sd_iwave_platdata;
+	platform_device_register(&sd_iwave_dev);
 #endif
 }
