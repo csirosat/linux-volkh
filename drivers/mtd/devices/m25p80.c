@@ -965,8 +965,10 @@ static int __devinit m25p_probe(struct spi_device *spi)
 	else if (flash->mtd.size > 0x1000000) {
 		/* enable 4-byte addressing if the device exceeds 16MiB */
 		flash->addr_width = 4;
-		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) {
+		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD ||
+			JEDEC_MFR(info->jedec_id) == CFI_MFR_ST) {
 			/* Dedicated 4-byte command set */
+			/* supported by ST/Micron MT25Q devices as well */
 			flash->read_opcode = flash->fast_read ?
 				OPCODE_FAST_READ_4B :
 				OPCODE_NORM_READ_4B;
@@ -974,7 +976,10 @@ static int __devinit m25p_probe(struct spi_device *spi)
 			/* No small sector erase for 4-byte command set */
 			flash->erase_opcode = OPCODE_SE_4B;
 			flash->mtd.erasesize = info->sector_size;
+			/* Default to 3-byte MODE so boot code is not caught out */
+			set_4byte(flash, info->jedec_id, 0);
 		} else
+			/* Use 4-byte MODE */
 			set_4byte(flash, info->jedec_id, 1);
 	} else {
 		flash->addr_width = 3;
