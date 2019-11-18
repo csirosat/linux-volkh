@@ -386,13 +386,13 @@ void __init m2s_spi_init(void)
 #if defined(CONFIG_M2S_MSS_SPI0) && defined(CONFIG_MTD_M25P80)
 		/*
 		 * SPI Flash partitioning for on-module SPI Flash (SPI0):
-		 *      0 -   ffff : U-boot environment
-		 *  10000 - 3fffff : Linux bootable image
-		 * 400000 - ffffff : JFFS2 filesystem
+		 *      0 -    ffff : U-boot environment
+		 *  10000 -  3fffff : Linux bootable image
+		 * 400000 - 3ffffff : JFFS2 filesystem
 		 */
-#		define M2S_VOLKH_SF_UBOOT_ENV_SIZE	0x010000 /* 64 KB */
-#		define M2S_VOLKH_SF_LINUX_IMG_SIZE	0x3F0000 /* ~4 MB */
-#		define M2S_VOLKH_SF_JFFS_PART_SIZE	0xC00000 /* 12 MB */
+#		define M2S_VOLKH_SF_UBOOT_ENV_SIZE	0x0010000 /* 64 KB */
+#		define M2S_VOLKH_SF_LINUX_IMG_SIZE	0x03F0000 /* ~4 MB */
+#		define M2S_VOLKH_SF_JFFS_PART_SIZE	0x3C00000 /* 60 MB */
 		static struct mtd_partition m2s_volkh_sf_mtd[] = {
 			{
 				.name   = "spi_flash_uboot_env",
@@ -429,7 +429,7 @@ void __init m2s_spi_init(void)
 		 * On-module SPI Flash (resides at SPI0,CS0)
 		 */
 		{
-			.modalias      = "m25p32",
+			.modalias      = "m25p80",
 			.max_speed_hz  = 25000000,
 			.bus_num       = 0,
 			.chip_select   = 0,
