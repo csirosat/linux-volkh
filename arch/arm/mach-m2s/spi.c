@@ -438,6 +438,19 @@ void __init m2s_spi_init(void)
 		},
 #endif /* CONFIG_M2S_MSS_SPI0 && CONFIG_MTD_M25P80 */
 
+#if defined(CONFIG_M2S_MSS_SPI1) && defined(CONFIG_SPI_SPIDEV)
+		/*
+		 * SPI user-space interface (resides at SPI1,CS0)
+		 */
+		{
+			.modalias      = "spidev",
+			.max_speed_hz  = 25000000,
+			.bus_num       = 1,
+			.chip_select   = 0,
+			.mode          = SPI_MODE_3,
+		},
+#endif /* CONFIG_M2S_MSS_SPI1 && CONFIG_SPI_SPIDEV */
+
 		};
 
 		/*
