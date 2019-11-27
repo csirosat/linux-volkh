@@ -62,76 +62,17 @@ static struct platform_device can_device = {
     .num_resources  = ARRAY_SIZE(can_resources)
  };
  
-// static struct irq_chip m2s_irq_chip = {
-	// .name		= "CAN",
-	// .enable		= m2s_irq_enable,
-	// .disable	= m2s_irq_disable,
-    // .set_type   = m2s_irq_set_type,
-	// .ack		= m2s_irq_ack,
-// };
 
 
  
 #endif /* CONFIG_CAN_M2S*/
 
 
-
-
-// static void m2s_irq_enable(unsigned irq)
-// {
-    // struct m2s_can_chip *m2s_chip = get_irq_chip_data(irq);
-    // struct irq_desc *desc = irq_to_desc(irq);
-    // unsigned long flags, can_cfg;
-
-    // spin_lock_irqsave(&m2s_chip->irq_lock, flags);
-    // desc->chip->unmask(irq);
-    // desc->status &= ~IRQ_MASKED;
-
-    // spin_unlock_irqrestore(&m2s_chip->irq_lock, flags);
-// } 
-
-// static void m2s_irq_disable(unsigned irq)
-// {
-    // struct m2s_can_chip *m2s_chip = get_irq_chip_data(irq);
-    // struct irq_desc *desc = irq_to_desc(irq);
-    // unsigned long flags, can_cfg;
-
-    // spin_lock_irq_save(&m2s_chip->irq_lock, flags);
-    // desc->chip->mask(irq);
-    // desc->status |= IRQ_MASKED;
-
-    // spin_unlock_irqrestore(&m2s_chip->irq_lock, flags);   
-// }
-
-// static void m2s_irq_ack(unsigned irq)
-// {
-    // struct m2s_can_chip *m2s_chip = get_irq_chip_data(irq);
-    
-
-// }
-
-
-
-
 void __init m2s_can_init(void)
 {
     //unsigned int IRQn;
 #if defined (CONFIG_CAN_M2S)
-    //irq = MSS_CAN_IRQ;
-    //nvic_unmask_irq(irq);
-    // IRQn = MSS_CAN_IRQ;
     
-    // m2s_irq_chip.mask = get_irq_chip(IRQn)->mask;
-    
-    // m2s_irq_chip.unmask = get_irq_chip(IRQn)->unmask;
-    
-    // set_irq_chip(IRQn, &m2s_irq_chip);
-    // set_irq_handler(IRQn, handle_level_irq);
-    // set_irq_flags(IRQn, IRQF_VALID);
-    //set_irq_chip_data(IRQn, &);
-    /* Check clocks, and register platform device */
-    // get apb1 clk for CAN 
-
     m2s_can_device_data.freq_apb = m2s_clock_get(CLCK_PCLK1);
     platform_set_drvdata(&can_device, &m2s_can_device_data);
     // Make platform device known to system 
