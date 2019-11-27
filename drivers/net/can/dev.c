@@ -225,6 +225,8 @@ int can_get_bittiming(struct net_device *dev, struct can_bittiming *bt)
 		if (err)
 			return err;
 	}
+	else
+		printk(KERN_INFO "%s in dev.c: bittiming_const not seeing priv struct\n", __func__);
 
 	return 0;
 }
@@ -582,6 +584,7 @@ static int can_changelink(struct net_device *dev,
 	struct can_priv *priv = netdev_priv(dev);
 	int err;
 
+	printk(KERN_INFO "%s in dev.c called\n", __func__);
 	/* We need synchronization with dev->stop() */
 	ASSERT_RTNL();
 
@@ -598,20 +601,25 @@ static int can_changelink(struct net_device *dev,
 
 	if (data[IFLA_CAN_BITTIMING]) {
 		struct can_bittiming bt;
-
+		printk(KERN_INFO "%s data[IFLGA_CAN_BITTIMING] true\n",__func__);
 		/* Do not allow changing bittiming while running */
 		if (dev->flags & IFF_UP)
 			return -EBUSY;
 		memcpy(&bt, nla_data(data[IFLA_CAN_BITTIMING]), sizeof(bt));
-		if ((!bt.bitrate && !bt.tq) || (bt.bitrate && bt.tq))
+		if ((!bt.bitrate && !bt.tq) || (bt.bitrate && bt.tq)) {
+			printk(KERN_INFO "%s bitrate and tq are either both 1 or both 0 ERROR\n", __func__);
 			return -EINVAL;
+		}
 		err = can_get_bittiming(dev, &bt);
-		if (err)
+		if (err) {
+			printk(KERN_INFO "%s can_get_bittiming() returned with error\n", __func__);
 			return err;
+		}
 		memcpy(&priv->bittiming, &bt, sizeof(bt));
 
 		if (priv->do_set_bittiming) {
 			/* Finally, set the bit-timing registers */
+			printk(KERN_INFO "%s calling do_set_bittiming driver function\n", __func__);
 			err = priv->do_set_bittiming(dev);
 			if (err)
 				return err;

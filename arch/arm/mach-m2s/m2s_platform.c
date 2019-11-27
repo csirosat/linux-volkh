@@ -39,6 +39,7 @@
 #include <mach/i2c.h>
 #include <mach/usb.h>
 #include <mach/gpio.h>
+#include <mach/can.h>
 
 extern unsigned int m2s_clock_sysref;
 
@@ -189,6 +190,10 @@ static void __init m2s_init(void)
 
 #if defined(CONFIG_M2S_ETH)
 	m2s_eth_init();
+#endif
+
+#if defined(CONFIG_CAN_M2S)
+	m2s_can_init();
 #endif
 
 #if defined(CONFIG_I2C_A2F)

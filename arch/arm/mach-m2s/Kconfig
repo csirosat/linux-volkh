@@ -38,6 +38,13 @@ config M2S_MSS_MAC
 	help
 	  Include support for the MSS MAC port
 
+config M2S_MSS_CAN
+	depends on ARCH_M2S && CAN_M2S
+	bool "Enable MSS CAN controller"
+	default y
+	help
+	   Include support for the MSS CAN controller
+
 config M2S_MSS_SPI0
 	depends on ARCH_M2S && SPI_M2S
 	bool "Enable MSS SPI0 port"

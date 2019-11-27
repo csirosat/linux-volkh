@@ -68,7 +68,7 @@ struct can_frame {
 #define CAN_MCNET	5 /* Bosch MCNet */
 #define CAN_ISOTP	6 /* ISO 15765-2 Transport Protocol */
 #define CAN_NPROTO	7
-
+#define CAN_IBP		8 /* Inovor Bus Protocol (added by Mia)*/ 
 #define SOL_CAN_BASE 100
 
 /**
