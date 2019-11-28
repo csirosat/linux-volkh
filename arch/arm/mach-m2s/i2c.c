@@ -128,6 +128,23 @@ void __init m2s_i2c_init(void)
 	 * Register a platform device for this interface
 	 */
 	platform_device_register(&i2c_m2s_dev0);
+
+	/*
+	 * Perform board-specific I2C device registration
+	 */ 
+	static struct i2c_board_info __initdata i2c_board_support_EFFv2[] = {
+            	{
+			I2C_BOARD_INFO("ads7828", 0x48)
+		},
+		{
+			I2C_BOARD_INFO("ads7828", 0x4A)
+		},
+		{
+			I2C_BOARD_INFO("max7300", 0x40)
+		}
+	};
+
+	i2c_register_board_info(0, &i2c_board_support_EFFv2, ARRAY_SIZE(i2c_board_support_EFFv2));
 #endif
 
 #if defined(CONFIG_M2S_MSS_I2C1)
