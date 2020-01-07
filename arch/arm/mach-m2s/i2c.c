@@ -111,16 +111,16 @@ void __init m2s_i2c_init(void)
 #if defined(CONFIG_M2S_MSS_I2C0)
 
 	/*
- 	 * Reset the I2C controller and then bring it out of reset
- 	 */
+	 * Reset the I2C controller and then bring it out of reset
+	 */
 	writel(readl(&M2S_SYSREG->soft_reset_cr) | I2C0_RST_CLR,
 		&M2S_SYSREG->soft_reset_cr);
 	writel(readl(&M2S_SYSREG->soft_reset_cr) & ~I2C0_RST_CLR,
 		&M2S_SYSREG->soft_reset_cr);
 
 	/*
- 	 * Pass the device parameters to the driver
- 	 */
+	 * Pass the device parameters to the driver
+	 */
 	i2c_m2s_data_dev0.ref_clk = m2s_clock_get(CLCK_PCLK0);
 	platform_set_drvdata(&i2c_m2s_dev0, &i2c_m2s_data_dev0);
 
@@ -133,7 +133,7 @@ void __init m2s_i2c_init(void)
 	 * Perform board-specific I2C device registration
 	 */ 
 	static struct i2c_board_info __initdata i2c_board_support_EFFv2[] = {
-            	{
+		{
 			I2C_BOARD_INFO("ads7828", 0x48)
 		},
 		{
@@ -144,22 +144,22 @@ void __init m2s_i2c_init(void)
 		}
 	};
 
-	i2c_register_board_info(0, &i2c_board_support_EFFv2, ARRAY_SIZE(i2c_board_support_EFFv2));
+	i2c_register_board_info(0, &i2c_board_support_EFFv2[0], ARRAY_SIZE(i2c_board_support_EFFv2));
 #endif
 
 #if defined(CONFIG_M2S_MSS_I2C1)
 
 	/*
- 	 * Reset the I2C controller and then bring it out of reset
- 	 */
+	 * Reset the I2C controller and then bring it out of reset
+	 */
 	writel(readl(&M2S_SYSREG->soft_reset_cr) | I2C1_RST_CLR,
 		&M2S_SYSREG->soft_reset_cr);
 	writel(readl(&M2S_SYSREG->soft_reset_cr) & ~I2C1_RST_CLR,
 		&M2S_SYSREG->soft_reset_cr);
 
 	/*
- 	 * Pass the device parameters to the driver
- 	 */
+	 * Pass the device parameters to the driver
+	 */
 	i2c_m2s_data_dev1.ref_clk = m2s_clock_get(CLCK_PCLK1);
 	platform_set_drvdata(&i2c_m2s_dev1, &i2c_m2s_data_dev1);
 
@@ -170,8 +170,8 @@ void __init m2s_i2c_init(void)
 #endif
 
 	/*
- 	 * Perform board-specific I2C device registration
- 	 */
+	 * Perform board-specific I2C device registration
+	 */
 	if (p == PLATFORM_M2S_SOM || p == PLATFORM_M2S_FG484_SOM
 			                  || p == PLATFORM_M2S_VOLKH) {
 #if defined(CONFIG_M2S_MSS_I2C1)
