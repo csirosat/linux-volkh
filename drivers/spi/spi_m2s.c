@@ -5,6 +5,9 @@
  * - Enhanced to support simultaneous use of SPI0 and SPI1
  * Copyright 2012-2013 Emcraft Systems
  *
+ * Modified by Mike Pilawa <Mike.Pilawa@csiro.au> to allow the
+ * driver to be used by CoreSPI controllers in the M2S FPGA fabric.
+ *
  * The code contained herein is licensed under the GNU General Public
  * License. You may obtain a copy of the GNU General Public License
  * Version 2 or later at the following locations:
@@ -59,6 +62,8 @@
 #define PDMA_CONTROL_PER_SEL_SPI0_TX	(0x5 << 23)
 #define PDMA_CONTROL_PER_SEL_SPI1_RX	(0x6 << 23)
 #define PDMA_CONTROL_PER_SEL_SPI1_TX	(0x7 << 23)
+#define PDMA_CONTROL_PER_SEL_SPI2_RX	(0x8 << 23)
+#define PDMA_CONTROL_PER_SEL_SPI2_TX	(0x9 << 23)
 /*
  * TBD: calculte ADJ value dynamically, basing on SPI clk value?
  * With smaller values we just hang-up
@@ -87,7 +92,9 @@
 /*
  * Access handle for the control registers
  */
-#define M2S_SPI(s)	((volatile struct m2s_spi_regs *)(s->spi_regs))
+#define MSS_SPI_HW	(s->bus < 2)
+#define M2S_MSS_SPI(s)	((volatile struct m2s_mss_spi_regs *)(s->spi_regs))
+#define M2S_CORESPI(s)	((volatile struct m2s_corespi_regs *)(s->spi_regs))
 #define M2S_PDMA(s)	((volatile struct m2s_pdma_regs *)(s->pdma_regs))
 
 /*
@@ -131,7 +138,7 @@ static struct m2s_spi_dsc *spi_m2s_dsc_tbl[8];
  * This is a 1-to-1 mapping of Actel's documentation onto a C structure.
  * Refer to SmartFusion Data Sheet for details.
  */
-struct m2s_spi_regs {
+struct m2s_mss_spi_regs {
 	u32	control;
 	u32	txrxdf_size;
 	u32	status;
@@ -142,6 +149,25 @@ struct m2s_spi_regs {
 	u32	slave_select;
 	u32	mis;
 	u32	ris;
+};
+
+/*
+ * This is a 1-to-1 mapping of the Microsemi CoreSPI register set
+ * onto a C structure.  Refer to CoreSPI User Guide for details.
+ */
+struct m2s_corespi_regs {
+	u32	control1;
+	u32	intclear;
+	u32	rxdata;
+	u32	txdata;
+	u32	intmask;
+	u32	intraw;
+	u32	control2;
+	u32	command;
+	u32	stat;
+	u32	ssel;
+	u32	txdata_last;
+	u32	clk_div;
 };
 
  /*
@@ -174,36 +200,46 @@ static int spi_m2s_hw_init(struct m2s_spi_dsc *s)
 	/*
 	 * Reset the MSS SPI controller and then bring it out of reset
 	 */
-	M2S_SYSREG->soft_reset_cr |= s->rst_clr;
-	M2S_SYSREG->soft_reset_cr &= ~s->rst_clr;
+	if (MSS_SPI_HW) {
+		M2S_SYSREG->soft_reset_cr |= s->rst_clr;
+		M2S_SYSREG->soft_reset_cr &= ~s->rst_clr;
+	}
 
 	/*
 	 * Set the master mode
+	 * CoreSPI MASTER bit has same mapping as MSS SPI
 	 */
-	M2S_SPI(s)->control |= SPI_CONTROL_MASTER;
+	M2S_MSS_SPI(s)->control |= SPI_CONTROL_MASTER;
 
 	/*
 	 * Set the transfer protocol. We are using the Motorola
 	 * SPI mode, with no user interface to configure it to
 	 * some other mode.
 	 */
-	M2S_SPI(s)->control &= ~SPI_CONTROL_PROTO_MSK;
-	M2S_SPI(s)->control |= SPI_CONTROL_PROTO_MOTO;
+	if (MSS_SPI_HW) {
+		M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_PROTO_MSK;
+		M2S_MSS_SPI(s)->control |= SPI_CONTROL_PROTO_MOTO;
+	}
 
 	/*
 	 * Set-up the controller in such a way that it doesn't remove
 	 * Chip Select until the entire message has been transferred,
 	 * even if at some points TX FIFO becomes empty.
 	 */
-	M2S_SPI(s)->control |= SPI_CONTROL_SPS | SPI_CONTROL_BIGFIFO |
+	if (MSS_SPI_HW) {
+		M2S_MSS_SPI(s)->control |= SPI_CONTROL_SPS | SPI_CONTROL_BIGFIFO |
 			       SPI_CONTROL_CLKMODE;
+	}
 
 	/*
 	 * Enable the SPI controller
 	 * It is critical to clear RESET in the control bit.
 	 */
-	M2S_SPI(s)->control &= ~SPI_CONTROL_RESET;
-	M2S_SPI(s)->control |= SPI_CONTROL_ENABLE;
+	if (MSS_SPI_HW) {
+		M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_RESET;
+	}
+	/* CoreSPI ENABLE bit has same mapping as MSS SPI */
+	M2S_MSS_SPI(s)->control |= SPI_CONTROL_ENABLE;
 
 	/*
 	 * Configure DMA (preliminary)
@@ -256,7 +292,11 @@ static inline int spi_m2s_hw_cs_set(struct m2s_spi_dsc *s, int cs)
 {
 	unsigned int v = (0 <= cs && cs <= 7) ? (1 << cs) : 0;
 
-	M2S_SPI(s)->slave_select = v;
+	if (MSS_SPI_HW) {
+		M2S_MSS_SPI(s)->slave_select = v;
+	} else {
+		M2S_CORESPI(s)->ssel = v;
+	}
 
 	return 0;
 }
@@ -293,7 +333,12 @@ static inline int spi_m2s_hw_clk_set(struct m2s_spi_dsc *s, unsigned int spd)
 	/*
 	 * Set the clock rate
 	 */
-	M2S_SPI(s)->clk_gen = i;
+	if (MSS_SPI_HW) {
+		M2S_MSS_SPI(s)->clk_gen = i;
+	} else {
+		M2S_CORESPI(s)->clk_div = i;
+	}
+
 done:
 	return ret;
 }
@@ -309,35 +354,49 @@ static inline int spi_m2s_hw_bt_check(struct m2s_spi_dsc *s, int bt)
 	/*
 	 * TO-DO: add support for frames that are not 8 bits
 	 */
-	return (8 <= bt && bt <= 16) ? 0 : 1;
+	return (bt == 8) ? 0 : 1;
 }
 
 /*
- * Set frame size (making an assumption that the supplied size is
- * supported by this controller)
+ * Set frame size
  * @s		slave
  * @bt		frame size
  * @returns	0->good,!=0->bad
  */
 static inline int spi_m2s_hw_bt_set(struct m2s_spi_dsc *s, int bt)
 {
-	int ret = 0;
+	int ret;
+
+	/*
+	 * First, check support for requested frame size.
+	 * Return if unsupported.
+	 */
+	ret = spi_m2s_hw_bt_check(s, bt);
+	if (ret) return ret;
+
+	/*
+	 * CoreSPI controller does not have a frame size register.
+	 * It is fixed by synthesis.
+	 */
+	if (!MSS_SPI_HW) {
+		return ret;
+	}
 
 	/*
 	 * Disable the SPI controller. Writes to data frame size have
 	 * no effect when the controller is enabled.
 	 */
-	M2S_SPI(s)->control &= ~SPI_CONTROL_ENABLE;
+	M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_ENABLE;
 
 	/*
 	 * Set the new data frame size.
 	 */
-	M2S_SPI(s)->txrxdf_size = bt;
+	M2S_MSS_SPI(s)->txrxdf_size = bt;
 
 	/*
 	 * Re-enable the SPI controller
 	 */
-	M2S_SPI(s)->control |= SPI_CONTROL_ENABLE;
+	M2S_MSS_SPI(s)->control |= SPI_CONTROL_ENABLE;
 
 	return ret;
 }
@@ -350,21 +409,28 @@ static inline int spi_m2s_hw_bt_set(struct m2s_spi_dsc *s, int bt)
 static inline void spi_m2s_hw_tfsz_set(struct m2s_spi_dsc *s, int len)
 {
 	/*
+	 * CoreSPI controller does not have a transfer length register field.
+	 */
+	if (!MSS_SPI_HW) {
+		return;
+	}
+
+	/*
 	 * Disable the SPI controller. Writes to transfer length have
 	 * no effect when the controller is enabled.
 	 */
-	M2S_SPI(s)->control &= ~SPI_CONTROL_ENABLE;
+	M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_ENABLE;
 
 	/*
 	 * Set the new data frame size.
 	 */
-	M2S_SPI(s)->control &= ~SPI_CONTROL_CNT_MSK;
-	M2S_SPI(s)->control |= len << SPI_CONTROL_CNT_SHF;
+	M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_CNT_MSK;
+	M2S_MSS_SPI(s)->control |= len << SPI_CONTROL_CNT_SHF;
 
 	/*
 	 * Re-enable the SPI controller
 	 */
-	M2S_SPI(s)->control |= SPI_CONTROL_ENABLE;
+	M2S_MSS_SPI(s)->control |= SPI_CONTROL_ENABLE;
 }
 
 /*
@@ -376,17 +442,25 @@ static inline void spi_m2s_hw_tfsz_set(struct m2s_spi_dsc *s, int len)
 static inline int spi_m2s_hw_mode_set(struct m2s_spi_dsc *s, unsigned int mode)
 {
 	/*
+	 * CoreSPI controller does not support mode setting.
+	 * It is fixed by synthesis.
+	 */
+	if (!MSS_SPI_HW) {
+		return 0;
+	}
+
+	/*
 	 * Set the mode
 	 */
 	if (mode & SPI_CPHA)
-		M2S_SPI(s)->control |= SPI_CONTROL_SPH;
+		M2S_MSS_SPI(s)->control |= SPI_CONTROL_SPH;
 	else
-		M2S_SPI(s)->control &= ~SPI_CONTROL_SPH;
+		M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_SPH;
 
 	if (mode & SPI_CPOL)
-		M2S_SPI(s)->control |= SPI_CONTROL_SPO;
+		M2S_MSS_SPI(s)->control |= SPI_CONTROL_SPO;
 	else
-		M2S_SPI(s)->control &= ~SPI_CONTROL_SPO;
+		M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_SPO;
 
 	return 0;
 }
@@ -406,12 +480,14 @@ static void spi_m2s_hw_release(struct m2s_spi_dsc *s)
 	/*
 	 * Disable the SPI controller
 	 */
-	M2S_SPI(s)->control &= ~SPI_CONTROL_ENABLE;
+	M2S_MSS_SPI(s)->control &= ~SPI_CONTROL_ENABLE;
 
 	/*
 	 * Put the SPI controller into reset
 	 */
-	M2S_SYSREG->soft_reset_cr |= s->rst_clr;
+	if (MSS_SPI_HW) {
+		M2S_SYSREG->soft_reset_cr |= s->rst_clr;
+	}
 }
 
 /*
@@ -474,6 +550,8 @@ static void spi_m2s_xfer_start(struct m2s_spi_dsc *s)
 		goto done;
 	}
 
+//	dev_info(&s->slave->dev, "Xfer start: bus=%i\n", s->bus);
+
 	/*
 	 * We don't use double buffering scheme, because we should be able to
 	 * change ADDR_INC value in each msg->transfer transaction (to set it to
@@ -499,7 +577,11 @@ static void spi_m2s_xfer_start(struct m2s_spi_dsc *s)
 		chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
 		chan->control |= PDMA_CONTROL_DST_ADDR_INC_0;
 	}
-	chan->buf[brx].src = (u32)&M2S_SPI(s)->rx_data;
+	if (MSS_SPI_HW) {
+		chan->buf[brx].src = (u32)&M2S_MSS_SPI(s)->rx_data;
+	} else {
+		chan->buf[brx].src = (u32)&M2S_CORESPI(s)->rxdata;
+	}
 	chan->buf[brx].dst = (u32)p;
 
 	/*
@@ -517,7 +599,11 @@ static void spi_m2s_xfer_start(struct m2s_spi_dsc *s)
 		chan->control |= PDMA_CONTROL_SRC_ADDR_INC_0;
 	}
 	chan->buf[btx].src = (u32)p;
-	chan->buf[btx].dst = (u32)&M2S_SPI(s)->tx_data;
+	if (MSS_SPI_HW) {
+		chan->buf[btx].dst = (u32)&M2S_MSS_SPI(s)->tx_data;
+	} else {
+		chan->buf[btx].dst = (u32)&M2S_CORESPI(s)->txdata;
+	}
 
 	if ((s->msg->actual_length + s->xf->len) / wb > M2S_SPI_MAX_LEN) {
 		len = M2S_SPI_MAX_LEN - (s->msg->actual_length / wb);
@@ -556,6 +642,18 @@ static int spi_m2s_handle_message(struct m2s_spi_dsc *s)
 		s->slave = dev;
 		ret = spi_m2s_prepare_for_slave(s, dev);
 		if (ret) {
+			s->slave = NULL;
+			goto done;
+		}
+	}
+	/*
+	 * Else, if this is a CoreSPI controller, always re-set the chip select.
+	 */
+	else if (!MSS_SPI_HW) {
+		if (spi_m2s_hw_cs_set(s, dev->chip_select)) {
+			dev_err(&s->slave->dev, "incorrect chip select: %d\n",
+				dev->chip_select);
+			ret = -EINVAL;
 			s->slave = NULL;
 			goto done;
 		}
@@ -646,7 +744,7 @@ static irqreturn_t spi_m2s_irq_cb(int irq, void *ptr)
 	 * This is somewhat hacky code resulting from the fact that
 	 * there is a single IRQ line shared by all PDMA channels.
 	 * We need to figure out which SPI controller that PDMA interrupt
-	 * refers to. Hence the below search to mape a PDMA channel
+	 * refers to. Hence the below search to map a PDMA channel
 	 * to a corresponding SPI controller data structure.
 	 */
 	for (i = 0; ! (M2S_PDMA(s)->status & (0x3 << (i*2))); i++);
@@ -673,7 +771,7 @@ static irqreturn_t spi_m2s_irq_cb(int irq, void *ptr)
 		chan->control |= PDMA_CONTROL_CLR_B;
 	}
 
-	/* Complete trasfer. */
+	/* Complete transfer. */
 	msg->actual_length += xf->len;
 	if ((msg->actual_length / wb) >= M2S_SPI_MAX_LEN) {
 		/* Can't send more, so truncate the message. */
@@ -692,6 +790,10 @@ static irqreturn_t spi_m2s_irq_cb(int irq, void *ptr)
 		/* Current message is completely transferred. */
 		s->msg = NULL;
 		spin_unlock(&s->lock);
+		/* If this is a CoreSPI controller clear the slave-select line. */
+		if (!MSS_SPI_HW) {
+			M2S_CORESPI(s)->ssel = 0;
+		}
 		msg->status = 0;
 		msg->complete(msg->context);
 		/* Current transfer is complete. Schedule the next one. */
@@ -826,7 +928,7 @@ static int __devinit spi_m2s_probe(struct platform_device *pdev)
 	 * [2-9]->soft-IP SPI controller specific to a custom design.
 	 */
 	bus = pdev->id;
-	if (! (0 <= bus && bus <= 10)) {
+	if (! (0 <= bus && bus <= 9)) {
 		dev_err(&pdev->dev, "invalid SPI controller %d\n", bus);
 		ret = -ENXIO;
 		goto error_release_nothing;
@@ -909,6 +1011,11 @@ static int __devinit spi_m2s_probe(struct platform_device *pdev)
 		s->drx_sel = PDMA_CONTROL_PER_SEL_SPI1_RX;
 		s->dtx_sel = PDMA_CONTROL_PER_SEL_SPI1_TX;
 		s->rst_clr = M2S_SYS_SOFT_RST_CR_SPI1;
+		break;
+	default:
+		s->drx_sel = PDMA_CONTROL_PER_SEL_SPI2_RX;
+		s->dtx_sel = PDMA_CONTROL_PER_SEL_SPI2_TX;
+		s->rst_clr = 0;
 		break;
 	}
 
