@@ -5,16 +5,57 @@
 
 /*
  * Copy data from IO memory space to "real" memory space.
- * This needs to be optimized.
+ * Optimized to use the most efficient access width: byte, word, or long.
  */
 void _memcpy_fromio(void *to, const void __iomem *from, size_t count)
 {
-	unsigned char *t = to;
+	const unsigned long  __iomem *fl;
+	const unsigned short __iomem *fw;
+	const unsigned char  __iomem *fb = from;
+	unsigned long  *tl;
+	unsigned short *tw;
+	unsigned char  *tb = to;
+
+	/* if count >= 4, and from & to both have same 4-byte alignment... */
+	if ((count >= 4) && (((unsigned long)fb & 0x3) == ((unsigned long)tb & 0x3))) {
+		/* first take care of any mis-alignment */
+		while ((unsigned long)fb & 0x3) {
+			count--;
+			*tb++ = readb(fb++);
+		}
+		/* next copy by long-words */
+		fl = (unsigned long *)fb;
+		tl = (unsigned long *)tb;
+		while (count >= 4) {
+			count -= 4;
+			*tl++ = readl(fl++);
+		}
+		/* copy pointers for tidy up below */
+		fb = (unsigned char *)fl;
+		tb = (unsigned char *)tl;
+	} else
+	/* if count >= 2, and from & to both have same 2-byte alignment... */
+	if ((count >= 2) && (((unsigned long)fb & 0x1) == ((unsigned long)tb & 0x1))) {
+		/* first take care of any mis-alignment */
+		while ((unsigned long)fb & 0x1) {
+			count--;
+			*tb++ = readb(fb++);
+		}
+		/* next copy by short-words */
+		fw = (unsigned short *)fb;
+		tw = (unsigned short *)tb;
+		while (count >= 2) {
+			count -= 2;
+			*tw++ = readw(fw++);
+		}
+		/* copy pointers for tidy up below */
+		fb = (unsigned char *)fw;
+		tb = (unsigned char *)tw;
+	}
+	/* tidy up any remaining bytes */
 	while (count) {
 		count--;
-		*t = readb(from);
-		t++;
-		from++;
+		*tb++ = readb(fb++);
 	}
 }
 
@@ -48,16 +89,57 @@ void _memcpy_fromiol(void *to, const void __iomem *from, size_t count)
 
 /*
  * Copy data from "real" memory space to IO memory space.
- * This needs to be optimized.
+ * Optimized to use the most efficient access width: byte, word, or long.
  */
 void _memcpy_toio(void __iomem *to, const void *from, size_t count)
 {
-	const unsigned char *f = from;
+	const unsigned long  *fl;
+	const unsigned short *fw;
+	const unsigned char  *fb = from;
+	unsigned long  __iomem *tl;
+	unsigned short __iomem *tw;
+	unsigned char  __iomem *tb = to;
+
+	/* if count >= 4, and from & to both have same 4-byte alignment... */
+	if ((count >= 4) && (((unsigned long)fb & 0x3) == ((unsigned long)tb & 0x3))) {
+		/* first take care of any mis-alignment */
+		while ((unsigned long)fb & 0x3) {
+			count--;
+			writeb(*fb++, tb++);
+		}
+		/* next copy by long-words */
+		fl = (unsigned long *)fb;
+		tl = (unsigned long *)tb;
+		while (count >= 4) {
+			count -= 4;
+			writel(*fl++, tl++);
+		}
+		/* copy pointers for tidy up below */
+		fb = (unsigned char *)fl;
+		tb = (unsigned char *)tl;
+	} else
+	/* if count >= 2, and from & to both have same 2-byte alignment... */
+	if ((count >= 2) && (((unsigned long)fb & 0x1) == ((unsigned long)tb & 0x1))) {
+		/* first take care of any mis-alignment */
+		while ((unsigned long)fb & 0x1) {
+			count--;
+			writeb(*fb++, tb++);
+		}
+		/* next copy by short-words */
+		fw = (unsigned short *)fb;
+		tw = (unsigned short *)tb;
+		while (count >= 2) {
+			count -= 2;
+			writeb(*fw++, tw++);
+		}
+		/* copy pointers for tidy up below */
+		fb = (unsigned char *)fw;
+		tb = (unsigned char *)tw;
+	}
+	/* tidy up any remaining bytes */
 	while (count) {
 		count--;
-		writeb(*f, to);
-		f++;
-		to++;
+		writeb(*fb++, tb++);
 	}
 }
 
