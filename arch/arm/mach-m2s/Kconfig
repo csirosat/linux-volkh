@@ -20,7 +20,7 @@ config M2S_CACHE
 config M2S_MSS_UART0
 	depends on ARCH_M2S && SERIAL_8250
 	bool "Enable MSS UART0 port"
-	default n
+	default y
 	help
 	  Include support for the MSS UART0 port
 
@@ -48,9 +48,16 @@ config M2S_MSS_SPI0
 config M2S_MSS_SPI1
 	depends on ARCH_M2S && SPI_M2S
 	bool "Enable MSS SPI1 port"
-	default n
+	default y
 	help
 	  Include support for the MSS SPI1 port
+
+config M2S_FPGA_SPI2
+	depends on ARCH_M2S && SPI_M2S
+	bool "Enable FPGA SPI2 port"
+	default n
+	help
+	  Include support for FPGA SPI controller (CoreSPI) SPI2 port
 
 config M2S_MSS_I2C0
 	depends on ARCH_M2S && I2C_A2F
@@ -66,10 +73,17 @@ config M2S_MSS_I2C1
 	help
 	  Include support for the MSS I2C1 port
 
+config M2S_FPGA_I2C2
+	depends on ARCH_M2S && I2C_A2F
+	bool "Enable FPGA I2C2 port"
+	default n
+	help
+	  Include support for FPGA I2C controller (CoreI2C) I2C2 port
+
 config M2S_MSS_USB
 	depends on ARCH_M2S && USB_MUSB_SOC && M2S_MSS_GPIO
 	bool "Enable MSS USB OTG port"
-	default y
+	default n
 	help
 	  Include support for the MSS USB OTG port
 
@@ -107,7 +121,7 @@ config M2S_FPGA_GPIO_ADDR
 config M2S_MMC_IWAVE
 	depends on ARCH_M2S && MMC_SDHCI_IWAVE
 	bool "Enable iWave Systems MMC/SDHCI IP core"
-	default y
+	default n
 	help
 	  Include support for iWave Systems MMC/SDHCI IP core 
 

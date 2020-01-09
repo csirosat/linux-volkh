@@ -96,10 +96,44 @@ static struct platform_device i2c_m2s_dev1 = {
 };
 
 static struct i2c_a2f_data i2c_m2s_data_dev1 = {
-	.i2c_clk	= 400000,
+	.i2c_clk	= 100000,
 };
 
 #endif	/* CONFIG_M2S_MSS_I2C1 */
+
+/*
+ * FPGA I2C_2
+ */
+#if defined(CONFIG_M2S_FPGA_I2C2)
+
+#define I2C_M2S_DEV2_IRQ	37
+#define I2C_M2S_DEV2_REGS	0x32000000
+
+static struct resource i2c_m2s_dev2_resources[] = {
+	{
+		.start	= I2C_M2S_DEV2_IRQ,
+		.end	= I2C_M2S_DEV2_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= I2C_M2S_DEV2_REGS,
+		.end	= I2C_M2S_DEV2_REGS + 0xFFF,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device i2c_m2s_dev2 = {
+	.name           = "i2c_a2f",
+	.id             = 2,
+	.num_resources  = ARRAY_SIZE(i2c_m2s_dev2_resources),
+	.resource       = i2c_m2s_dev2_resources,
+};
+
+static struct i2c_a2f_data i2c_m2s_data_dev2 = {
+	.i2c_clk	= 400000,
+};
+
+#endif	/* CONFIG_M2S_FPGA_I2C2 */
 
 /*
  * Register the M2S specific I2C devices with the kernel.
@@ -132,20 +166,22 @@ void __init m2s_i2c_init(void)
 	/*
 	 * Perform board-specific I2C device registration
 	 */ 
-	static struct i2c_board_info __initdata i2c_board_support_EFFv2[] = {
-		{
-			I2C_BOARD_INFO("ads7828", 0x48)
-		},
-		{
-			I2C_BOARD_INFO("ads7828", 0x4A)
-		},
-		{
-			I2C_BOARD_INFO("max7300", 0x40)
-		}
-	};
+	if (p == PLATFORM_M2S_VOLKH) {
+		static struct i2c_board_info __initdata i2c_board_support_EFFv2[] = {
+			{
+				I2C_BOARD_INFO("ads7828", 0x48)
+			},
+			{
+				I2C_BOARD_INFO("ads7828", 0x4A)
+			},
+			{
+				I2C_BOARD_INFO("max7300", 0x40)
+			}
+		};
 
-	i2c_register_board_info(0, &i2c_board_support_EFFv2[0], ARRAY_SIZE(i2c_board_support_EFFv2));
-#endif
+		i2c_register_board_info(0, &i2c_board_support_EFFv2[0], ARRAY_SIZE(i2c_board_support_EFFv2));
+	}
+#endif /* CONFIG_M2S_MSS_I2C0 */
 
 #if defined(CONFIG_M2S_MSS_I2C1)
 
@@ -167,30 +203,49 @@ void __init m2s_i2c_init(void)
 	 * Register a platform device for this interface
 	 */
 	platform_device_register(&i2c_m2s_dev1);
-#endif
 
 	/*
 	 * Perform board-specific I2C device registration
 	 */
-	if (p == PLATFORM_M2S_SOM || p == PLATFORM_M2S_FG484_SOM
-			                  || p == PLATFORM_M2S_VOLKH) {
-#if defined(CONFIG_M2S_MSS_I2C1)
+	if (p == PLATFORM_M2S_SOM || p == PLATFORM_M2S_FG484_SOM) {
 
+#if defined(CONFIG_EEPROM_AT24)
 		/*
 		 * This assumes that a compatible I2C Flash is
 		 * wired to I2C_1 in the baseboard area.
 		 */
-#if defined(CONFIG_EEPROM_AT24)
-		static struct i2c_board_info i2c_eeprom__m2s_som= {
+		static struct i2c_board_info i2c_eeprom__m2s_som = {
 			I2C_BOARD_INFO("24c512", 0x51)
 		};
-#endif
 
-#if defined(CONFIG_EEPROM_AT24)
 		i2c_register_board_info(1, &i2c_eeprom__m2s_som, 1);
-#endif
+#endif /* CONFIG_EEPROM_AT24 */
 
-#endif
 	}
-}
+
+#endif /* CONFIG_M2S_MSS_I2C1 */
+
+#if defined(CONFIG_M2S_FPGA_I2C2)
+
+	/*
+	 * Pass the device parameters to the driver
+	 */
+	i2c_m2s_data_dev2.ref_clk = m2s_clock_get(CLCK_SYSREF);
+	platform_set_drvdata(&i2c_m2s_dev2, &i2c_m2s_data_dev2);
+
+	/*
+	 * Register a platform device for this interface
+	 */
+	platform_device_register(&i2c_m2s_dev2);
+
+	/*
+	 * Perform board-specific I2C device registration
+	 */
+	if (p == PLATFORM_M2S_VOLKH) {
+
+	}
+
+#endif /* CONFIG_M2S_FPGA_I2C2 */
+
+} /* m2s_i2c_init() */
 

@@ -53,16 +53,22 @@
 #define SPI1_M2S_RX_DMA		2
 #define SPI1_M2S_TX_DMA		3
 
+#define SPI2_M2S_ID		2
+#define SPI2_M2S_REGS		0x32100000
+#define SPI2_M2S_CLK		CLCK_SYSREF
+#define SPI2_M2S_RX_DMA		4
+#define SPI2_M2S_TX_DMA		5
+
 #if defined(CONFIG_M2S_MSS_SPI0)
 
 static struct resource spi_m2s_dev0_resources[] = {
 	{
 		.start	= SPI0_M2S_REGS,
-		.end	= SPI0_M2S_REGS + 1,
+		.end	= SPI0_M2S_REGS + 0xFFF,
 		.flags	= IORESOURCE_MEM,
 	}, {
 		.start	= PDMA_M2S_REGS,
-		.end	= PDMA_M2S_REGS + 1,
+		.end	= PDMA_M2S_REGS + 0xFFF,
 		.flags	= IORESOURCE_MEM,
 	}, {
 		.start  = PDMA_M2S_IRQ,
@@ -89,11 +95,11 @@ static struct platform_device spi_m2s_dev0 = {
 static struct resource spi_m2s_dev1_resources[] = {
 	{
 		.start	= SPI1_M2S_REGS,
-		.end	= SPI1_M2S_REGS + 1,
+		.end	= SPI1_M2S_REGS + 0xFFF,
 		.flags	= IORESOURCE_MEM,
 	}, {
 		.start	= PDMA_M2S_REGS,
-		.end	= PDMA_M2S_REGS + 1,
+		.end	= PDMA_M2S_REGS + 0xFFF,
 		.flags	= IORESOURCE_MEM,
 	}, {
 		.start	= PDMA_M2S_IRQ,
@@ -114,6 +120,37 @@ static struct platform_device spi_m2s_dev1 = {
 };
 
 #endif  /* CONFIG_M2S_MSS_SPI1 */
+
+#if defined(CONFIG_M2S_FPGA_SPI2)
+
+static struct resource spi_m2s_dev2_resources[] = {
+	{
+		.start	= SPI2_M2S_REGS,
+		.end	= SPI2_M2S_REGS + 0xFFF,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= PDMA_M2S_REGS,
+		.end	= PDMA_M2S_REGS + 0xFFF,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= PDMA_M2S_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct spi_m2s_platform_data spi_m2s_dev2_data = {
+	.dma_rx		= SPI2_M2S_RX_DMA,
+	.dma_tx		= SPI2_M2S_TX_DMA,
+};
+
+static struct platform_device spi_m2s_dev2 = {
+	.name			= "spi_m2s",
+	.id				= SPI2_M2S_ID,
+	.num_resources	= ARRAY_SIZE(spi_m2s_dev2_resources),
+	.resource		= spi_m2s_dev2_resources,
+};
+
+#endif  /* CONFIG_M2S_FPGA_SPI2 */
 
 /*
  * Register the M2S specific SPI controllers and devices with the kernel.
@@ -141,9 +178,19 @@ void __init m2s_spi_init(void)
 #endif  /* CONFIG_M2S_MSS_SPI1 */
 
 	/*
+	 * Register platform device for SPI2 controller
+	 */
+#if defined(CONFIG_M2S_FPGA_SPI2)
+	spi_m2s_dev2_data.ref_clk = m2s_clock_get(SPI2_M2S_CLK);
+	platform_set_drvdata(&spi_m2s_dev2, &spi_m2s_dev2_data);
+	platform_device_register(&spi_m2s_dev2);
+#endif  /* CONFIG_M2S_FPGA_SPI2 */
+
+	/*
 	 * Define SPI slave data structures for all connected SPI devices
 	 */
-#if defined(CONFIG_M2S_MSS_SPI0) || defined(CONFIG_M2S_MSS_SPI1)
+#if defined(CONFIG_M2S_MSS_SPI0) || defined(CONFIG_M2S_MSS_SPI1) || \
+	defined(CONFIG_M2S_FPGA_SPI2)
 
 	/*
 	 * PLATFORM_M2S_SOM || PLATFORM_M2S_FG484_SOM
@@ -451,6 +498,19 @@ void __init m2s_spi_init(void)
 		},
 #endif /* CONFIG_M2S_MSS_SPI1 && CONFIG_SPI_SPIDEV */
 
+#if defined(CONFIG_M2S_FPGA_SPI2) && defined(CONFIG_SPI_SPIDEV)
+		/*
+		 * SPI user-space interface (resides at SPI2,CS0)
+		 */
+		{
+			.modalias      = "spidev",
+			.max_speed_hz  = 25000000,
+			.bus_num       = 2,
+			.chip_select   = 0,
+			.mode          = SPI_MODE_0, /* fixed by HW */
+		},
+#endif /* CONFIG_M2S_FPGA_SPI2 && CONFIG_SPI_SPIDEV */
+
 		};
 
 		/*
@@ -462,6 +522,6 @@ void __init m2s_spi_init(void)
 
 	}
 
-#endif /* CONFIG_M2S_MSS_SPI0 || CONFIG_M2S_MSS_SPI1 */
+#endif /* CONFIG_M2S_MSS_SPI0 || CONFIG_M2S_MSS_SPI1 || CONFIG_M2S_FPGA_SPI2 */
 
 }
