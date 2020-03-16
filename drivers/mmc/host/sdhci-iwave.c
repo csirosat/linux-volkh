@@ -114,7 +114,7 @@ static int __devinit sdhci_iwave_probe(struct platform_device *pdev)
 	struct sdhci_iwave_platdata *pdata = pdev->dev.platform_data;
 	struct device *dev = &pdev->dev;
 	struct sdhci_host *host;
-	struct sdhci_iwave *sc;
+	struct sdhci_iwave *iwave;
 	struct resource *res;
 	int ret, irq;
 
@@ -141,17 +141,17 @@ static int __devinit sdhci_iwave_probe(struct platform_device *pdev)
 		return PTR_ERR(host);
 	}
 
-	sc = sdhci_priv(host);
+	iwave = sdhci_priv(host);
 
-	sc->host = host;
-	sc->pdev = pdev;
-	sc->pdata = pdata;
+	iwave->host = host;
+	iwave->pdev = pdev;
+	iwave->pdata = pdata;
 
 	platform_set_drvdata(pdev, host);
 
-	sc->ioarea = request_mem_region(res->start, resource_size(res),
+	iwave->ioarea = request_mem_region(res->start, resource_size(res),
 					mmc_hostname(host->mmc));
-	if (!sc->ioarea) {
+	if (!iwave->ioarea) {
 		dev_err(dev, "failed to reserve register area\n");
 		ret = -ENXIO;
 		goto err_req_regs;
@@ -161,7 +161,7 @@ static int __devinit sdhci_iwave_probe(struct platform_device *pdev)
 	if (!host->ioaddr) {
 		dev_err(dev, "failed to map registers\n");
 		ret = -ENXIO;
-		goto err_req_regs;
+		goto err_remap_mem;
 	}
 
 	host->hw_name = pdata->hw_name;
@@ -192,18 +192,30 @@ static int __devinit sdhci_iwave_probe(struct platform_device *pdev)
 
 	return 0;
 
- err_add_host:
-	release_resource(sc->ioarea);
-	kfree(sc->ioarea);
+err_add_host:
+	iounmap(iwave->ioarea);
 
- err_req_regs:
+err_remap_mem:
+	release_mem_region(res->start, resource_size(res));
+
+err_req_regs:
 	sdhci_free_host(host);
 
+	dev_err(dev, "probing of sdhci-iwave failed: %d\n", ret);
 	return ret;
 }
 
 static int __devexit sdhci_iwave_remove(struct platform_device *pdev)
 {
+	struct sdhci_host *host = platform_get_drvdata(pdev);
+	struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+	sdhci_remove_host(host, 0); // assuming not-dead
+	iounmap(host->ioaddr);
+	release_mem_region(iomem->start, resource_size(iomem));
+	sdhci_free_host(host);
+	platform_set_drvdata(pdev, NULL);
+
 	return 0;
 }
 
