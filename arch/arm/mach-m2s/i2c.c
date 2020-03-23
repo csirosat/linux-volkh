@@ -26,10 +26,12 @@
 #include <linux/irq.h>
 #include <linux/serial_8250.h>
 #include <linux/i2c.h>
+#include <linux/spi/max7301.h>
 #include <mach/m2s.h>
 #include <mach/platform.h>
 #include <mach/clock.h>
 #include <mach/i2c.h>
+
 
 /*
  * MSS I2C_0
@@ -167,19 +169,26 @@ void __init m2s_i2c_init(void)
 	 * Perform board-specific I2C device registration
 	 */ 
 	if (p == PLATFORM_M2S_VOLKH) {
-		static struct i2c_board_info __initdata i2c_board_support_EFFv2[] = {
+		static struct max7301_platform_data m2s_volkh_max7300_info = {
+				.base = -1,
+		};
+
+		static struct i2c_board_info __initdata m2s_volkh_i2c_dev0_info[] = {
+			{
+				//I2C_BOARD_INFO("max7300", 0x40)
+				.type          = "max7300",
+				.addr          = 0x40,
+				.platform_data = &m2s_volkh_max7300_info,
+			},
 			{
 				I2C_BOARD_INFO("ads7828", 0x48)
 			},
 			{
 				I2C_BOARD_INFO("ads7828", 0x4A)
 			},
-			{
-				I2C_BOARD_INFO("max7300", 0x40)
-			}
 		};
 
-		i2c_register_board_info(0, &i2c_board_support_EFFv2[0], ARRAY_SIZE(i2c_board_support_EFFv2));
+		i2c_register_board_info(0, &m2s_volkh_i2c_dev0_info[0], ARRAY_SIZE(m2s_volkh_i2c_dev0_info));
 	}
 #endif /* CONFIG_M2S_MSS_I2C0 */
 

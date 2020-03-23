@@ -217,7 +217,7 @@ exit_destroy:
 	mutex_destroy(&ts->lock);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(__max730x_probe);
+//EXPORT_SYMBOL_GPL(__max730x_probe);
 
 int __devexit __max730x_remove(struct device *dev)
 {
@@ -241,4 +241,5 @@ int __devexit __max730x_remove(struct device *dev)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(__max730x_remove);
+//EXPORT_SYMBOL_GPL(__max730x_remove);
+
