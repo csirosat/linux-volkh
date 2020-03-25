@@ -124,6 +124,13 @@ config M2S_MMC_IWAVE
 	default n
 	help
 	  Include support for iWave Systems MMC/SDHCI IP core 
+	  
+config M2S_MSS_CAN
+	depends on ARCH_M2S && CAN_M2S
+	bool "Enable MSS CAN Controller"
+	default n
+	help
+		Include support for the MSS CAN controller
 
 endmenu
 

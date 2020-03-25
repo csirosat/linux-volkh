@@ -21,6 +21,12 @@ config CAN_DEV
 	  support. This is the standard library for CAN drivers.
 	  If unsure, say Y.
 
+config CAN_M2S
+	tristate "Microsemi Smartfusion2 CAN controller"
+	depends on CAN_DEV && ARCH_M2S
+	---help---
+	Driver for Microsemi SmartFusion2 CAN controller
+	  
 config CAN_CALC_BITTIMING
 	bool "CAN bit-timing calculation"
 	depends on CAN_DEV
