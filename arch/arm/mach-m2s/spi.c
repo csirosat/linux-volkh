@@ -200,28 +200,55 @@ void __init m2s_spi_init(void)
 #if defined(CONFIG_M2S_MSS_SPI0) && defined(CONFIG_MTD_M25P80)
 		/*
 		 * SPI Flash partitioning for on-module SPI Flash (SPI0):
-		 *      0 -   ffff:	U-boot environment
-		 *  10000 - 40ffff:	Linux bootable image
-		 * 410000 - ffffff:	JFFS2 filesystem
+		 * 000000 - 00FFFF : SPI Directory
+		 * 010000 - 01FFFF : U-boot environment
+		 * 020000 - 3FFFFF : Linux backup image
+		 * 400000 - 7FFFFF : Linux normal image
+		 * 800000 - BFFFFF : FPGA golden image
+		 * C00000 - FFFFFF : FPGA update image
 		 */
-#		define M2S_SOM_SF_MTD_OFFSET	0x010000 /* 64 KB */
-#		define M2S_SOM_SF_MTD_SIZE0		0x400000 /*  4 MB */
-#		define M2S_SOM_SF_MTD_SIZE1		0xBF0000 /*~12 MB */
+#		define M2S_SOM_SF_SPI_DIRECTORY_SIZE	0x0010000 /* 64 KB */
+#		define M2S_SOM_SF_UBOOT_ENVIRON_SIZE	0x0010000 /* 64 KB */
+#		define M2S_SOM_SF_LINUX_BACKUP_SIZE		0x03E0000 /*  4 MB - 128 KB */
+#		define M2S_SOM_SF_LINUX_NORMAL_SIZE		0x0400000 /*  4 MB */
+#		define M2S_SOM_SF_FPGA_GOLDEN_SIZE		0x0400000 /*  4 MB */
+#		define M2S_SOM_SF_FPGA_UPDATE_SIZE		0x0400000 /*  4 MB */
 		static struct mtd_partition m2s_som_sf_mtd[] = {
-			{
-				.name   = "spi_flash_uboot_env",
-				.offset = 0,
-				.size   = M2S_SOM_SF_MTD_OFFSET,
-			}, {
-				.name   = "spi_flash_linux_image",
-				.offset = M2S_SOM_SF_MTD_OFFSET,
-				.size   = M2S_SOM_SF_MTD_SIZE0,
-			}, {
-				.name   = "spi_flash_jffs2",
-				.offset = M2S_SOM_SF_MTD_OFFSET +
-				          M2S_SOM_SF_MTD_SIZE0,
-				.size   = M2S_SOM_SF_MTD_SIZE1,
-			},
+				{
+					.name   = "spi_flash_spi_directory",
+					.offset = 0,
+					.size   = M2S_SOM_SF_SPI_DIRECTORY_SIZE,
+				}, {
+					.name   = "spi_flash_uboot_environ",
+					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE,
+					.size   = M2S_SOM_SF_UBOOT_ENVIRON_SIZE,
+				}, {
+					.name   = "spi_flash_linux_backup",
+					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
+					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE,
+					.size   = M2S_SOM_SF_LINUX_BACKUP_SIZE,
+				}, {
+					.name   = "spi_flash_linux_normal",
+					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
+					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE +
+							  M2S_SOM_SF_LINUX_BACKUP_SIZE,
+					.size   = M2S_SOM_SF_LINUX_NORMAL_SIZE,
+				}, {
+					.name   = "spi_flash_fpga_golden",
+					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
+					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE +
+							  M2S_SOM_SF_LINUX_BACKUP_SIZE +
+							  M2S_SOM_SF_LINUX_NORMAL_SIZE,
+					.size   = M2S_SOM_SF_FPGA_GOLDEN_SIZE,
+				}, {
+					.name   = "spi_flash_fpga_update",
+					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
+					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE +
+							  M2S_SOM_SF_LINUX_BACKUP_SIZE +
+							  M2S_SOM_SF_LINUX_NORMAL_SIZE +
+							  M2S_SOM_SF_FPGA_GOLDEN_SIZE,
+					.size   = M2S_SOM_SF_FPGA_UPDATE_SIZE,
+				},
 		};
 
 		static struct flash_platform_data m2s_som_sf_data = {
@@ -433,27 +460,65 @@ void __init m2s_spi_init(void)
 #if defined(CONFIG_M2S_MSS_SPI0) && defined(CONFIG_MTD_M25P80)
 		/*
 		 * SPI Flash partitioning for on-module SPI Flash (SPI0):
-		 *      0 -    ffff : U-boot environment
-		 *  10000 -  3fffff : Linux bootable image
-		 * 400000 - 3ffffff : JFFS2 filesystem
+		 * 0000000 - 000FFFF : SPI Directory
+		 * 0010000 - 001FFFF : U-boot environment
+		 * 0020000 - 07FFFFF : Linux backup image
+		 * 0800000 - 0FFFFFF : Linux normal image
+		 * 1000000 - 13FFFFF : FPGA golden image
+		 * 1400000 - 17FFFFF : FPGA update image
+		 * 1800000 - 3FFFFFF : JFFS2 filesystem
 		 */
-#		define M2S_VOLKH_SF_UBOOT_ENV_SIZE	0x0010000 /* 64 KB */
-#		define M2S_VOLKH_SF_LINUX_IMG_SIZE	0x03F0000 /* ~4 MB */
-#		define M2S_VOLKH_SF_JFFS_PART_SIZE	0x3C00000 /* 60 MB */
+#		define M2S_VOLKH_SF_SPI_DIRECTORY_SIZE	0x0010000 /* 64 KB */
+#		define M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE	0x0010000 /* 64 KB */
+#		define M2S_VOLKH_SF_LINUX_BACKUP_SIZE	0x07E0000 /*  8 MB - 128 KB */
+#		define M2S_VOLKH_SF_LINUX_NORMAL_SIZE	0x0800000 /*  8 MB */
+#		define M2S_VOLKH_SF_FPGA_GOLDEN_SIZE	0x0400000 /*  4 MB */
+#		define M2S_VOLKH_SF_FPGA_UPDATE_SIZE	0x0400000 /*  4 MB */
+#		define M2S_VOLKH_SF_JFFS2_PART_SIZE		0x2800000 /* 40 MB */
 		static struct mtd_partition m2s_volkh_sf_mtd[] = {
 			{
-				.name   = "spi_flash_uboot_env",
+				.name   = "spi_flash_spi_directory",
 				.offset = 0,
-				.size   = M2S_VOLKH_SF_UBOOT_ENV_SIZE,
+				.size   = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE,
 			}, {
-				.name   = "spi_flash_linux_image",
-				.offset = M2S_VOLKH_SF_UBOOT_ENV_SIZE,
-				.size   = M2S_VOLKH_SF_LINUX_IMG_SIZE,
+				.name   = "spi_flash_uboot_environ",
+				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE,
+				.size   = M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE,
 			}, {
-				.name   = "spi_flash_jffs2",
-				.offset = M2S_VOLKH_SF_UBOOT_ENV_SIZE +
-				          M2S_VOLKH_SF_LINUX_IMG_SIZE,
-				.size   = M2S_VOLKH_SF_JFFS_PART_SIZE,
+				.name   = "spi_flash_linux_backup",
+				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
+				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE,
+				.size   = M2S_VOLKH_SF_LINUX_BACKUP_SIZE,
+			}, {
+				.name   = "spi_flash_linux_normal",
+				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
+				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
+						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE,
+				.size   = M2S_VOLKH_SF_LINUX_NORMAL_SIZE,
+			}, {
+				.name   = "spi_flash_fpga_golden",
+				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
+				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
+						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
+						  M2S_VOLKH_SF_LINUX_NORMAL_SIZE,
+				.size   = M2S_VOLKH_SF_FPGA_GOLDEN_SIZE,
+			}, {
+				.name   = "spi_flash_fpga_update",
+				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
+				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
+						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
+						  M2S_VOLKH_SF_LINUX_NORMAL_SIZE +
+						  M2S_VOLKH_SF_FPGA_GOLDEN_SIZE,
+				.size   = M2S_VOLKH_SF_FPGA_UPDATE_SIZE,
+			}, {
+				.name   = "spi_flash_jffs2_part",
+				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
+						  M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
+						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
+						  M2S_VOLKH_SF_LINUX_NORMAL_SIZE +
+						  M2S_VOLKH_SF_FPGA_GOLDEN_SIZE +
+						  M2S_VOLKH_SF_FPGA_UPDATE_SIZE,
+				.size   = M2S_VOLKH_SF_JFFS2_PART_SIZE,
 			},
 		};
 
