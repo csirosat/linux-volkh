@@ -33,7 +33,7 @@ extern void mss_envm_init(void);
  */
 static inline unsigned long mss_envm_size(void)
 {
-	return (1024 * 256);
+	return (1024 * (256 - 8)); // M2S060 top 8KB is private SysCtrl access
 }
 
 /*

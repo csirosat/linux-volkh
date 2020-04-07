@@ -65,7 +65,6 @@ struct mss_envm {
  * Base address of the eNVM Flash
  */
 #define MSS_ENVM_BASE			0x60000000
-#define MSS_ENVM_READ_BASE		0x00000000
 
 /*
  * eNVM page parameters
@@ -179,7 +178,7 @@ int mss_envm_write(unsigned int offset, void *buf, unsigned int size)
  */
 int mss_envm_read(unsigned int offset, void *buf, unsigned int size)
 {
-	memcpy(buf, (void *) (MSS_ENVM_READ_BASE + offset), size);
+	memcpy(buf, (void *) (MSS_ENVM_BASE + offset), size);
 
 	return size;
 }
