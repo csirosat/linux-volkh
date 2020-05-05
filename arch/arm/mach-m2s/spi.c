@@ -113,10 +113,10 @@ static struct spi_m2s_platform_data spi_m2s_dev1_data = {
 };
 
 static struct platform_device spi_m2s_dev1 = {
-	.name			= "spi_m2s",
-	.id				= SPI1_M2S_ID,
+	.name		= "spi_m2s",
+	.id		= SPI1_M2S_ID,
 	.num_resources	= ARRAY_SIZE(spi_m2s_dev1_resources),
-	.resource		= spi_m2s_dev1_resources,
+	.resource	= spi_m2s_dev1_resources,
 };
 
 #endif  /* CONFIG_M2S_MSS_SPI1 */
@@ -144,10 +144,10 @@ static struct spi_m2s_platform_data spi_m2s_dev2_data = {
 };
 
 static struct platform_device spi_m2s_dev2 = {
-	.name			= "spi_m2s",
-	.id				= SPI2_M2S_ID,
+	.name		= "spi_m2s",
+	.id		= SPI2_M2S_ID,
 	.num_resources	= ARRAY_SIZE(spi_m2s_dev2_resources),
-	.resource		= spi_m2s_dev2_resources,
+	.resource	= spi_m2s_dev2_resources,
 };
 
 #endif  /* CONFIG_M2S_FPGA_SPI2 */
@@ -181,9 +181,11 @@ void __init m2s_spi_init(void)
 	 * Register platform device for SPI2 controller
 	 */
 #if defined(CONFIG_M2S_FPGA_SPI2)
-	spi_m2s_dev2_data.ref_clk = m2s_clock_get(SPI2_M2S_CLK);
-	platform_set_drvdata(&spi_m2s_dev2, &spi_m2s_dev2_data);
-	platform_device_register(&spi_m2s_dev2);
+	if (p == PLATFORM_M2S_VOLKH) {
+		spi_m2s_dev2_data.ref_clk = m2s_clock_get(SPI2_M2S_CLK);
+		platform_set_drvdata(&spi_m2s_dev2, &spi_m2s_dev2_data);
+		platform_device_register(&spi_m2s_dev2);
+	}
 #endif  /* CONFIG_M2S_FPGA_SPI2 */
 
 	/*
@@ -231,22 +233,22 @@ void __init m2s_spi_init(void)
 					.name   = "spi_flash_linux_normal",
 					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
 					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE +
-							  M2S_SOM_SF_LINUX_BACKUP_SIZE,
+					          M2S_SOM_SF_LINUX_BACKUP_SIZE,
 					.size   = M2S_SOM_SF_LINUX_NORMAL_SIZE,
 				}, {
 					.name   = "spi_flash_fpga_golden",
 					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
 					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE +
-							  M2S_SOM_SF_LINUX_BACKUP_SIZE +
-							  M2S_SOM_SF_LINUX_NORMAL_SIZE,
+					          M2S_SOM_SF_LINUX_BACKUP_SIZE +
+					          M2S_SOM_SF_LINUX_NORMAL_SIZE,
 					.size   = M2S_SOM_SF_FPGA_GOLDEN_SIZE,
 				}, {
 					.name   = "spi_flash_fpga_update",
 					.offset = M2S_SOM_SF_SPI_DIRECTORY_SIZE +
 					          M2S_SOM_SF_UBOOT_ENVIRON_SIZE +
-							  M2S_SOM_SF_LINUX_BACKUP_SIZE +
-							  M2S_SOM_SF_LINUX_NORMAL_SIZE +
-							  M2S_SOM_SF_FPGA_GOLDEN_SIZE,
+					          M2S_SOM_SF_LINUX_BACKUP_SIZE +
+					          M2S_SOM_SF_LINUX_NORMAL_SIZE +
+					          M2S_SOM_SF_FPGA_GOLDEN_SIZE,
 					.size   = M2S_SOM_SF_FPGA_UPDATE_SIZE,
 				},
 		};
@@ -493,31 +495,31 @@ void __init m2s_spi_init(void)
 				.name   = "spi_flash_linux_normal",
 				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
 				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
-						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE,
+				          M2S_VOLKH_SF_LINUX_BACKUP_SIZE,
 				.size   = M2S_VOLKH_SF_LINUX_NORMAL_SIZE,
 			}, {
 				.name   = "spi_flash_fpga_golden",
 				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
 				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
-						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
-						  M2S_VOLKH_SF_LINUX_NORMAL_SIZE,
+				          M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
+				          M2S_VOLKH_SF_LINUX_NORMAL_SIZE,
 				.size   = M2S_VOLKH_SF_FPGA_GOLDEN_SIZE,
 			}, {
 				.name   = "spi_flash_fpga_update",
 				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
 				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
-						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
-						  M2S_VOLKH_SF_LINUX_NORMAL_SIZE +
-						  M2S_VOLKH_SF_FPGA_GOLDEN_SIZE,
+				          M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
+				          M2S_VOLKH_SF_LINUX_NORMAL_SIZE +
+				          M2S_VOLKH_SF_FPGA_GOLDEN_SIZE,
 				.size   = M2S_VOLKH_SF_FPGA_UPDATE_SIZE,
 			}, {
 				.name   = "spi_flash_jffs2_part",
 				.offset = M2S_VOLKH_SF_SPI_DIRECTORY_SIZE +
-						  M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
-						  M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
-						  M2S_VOLKH_SF_LINUX_NORMAL_SIZE +
-						  M2S_VOLKH_SF_FPGA_GOLDEN_SIZE +
-						  M2S_VOLKH_SF_FPGA_UPDATE_SIZE,
+				          M2S_VOLKH_SF_UBOOT_ENVIRON_SIZE +
+				          M2S_VOLKH_SF_LINUX_BACKUP_SIZE +
+				          M2S_VOLKH_SF_LINUX_NORMAL_SIZE +
+				          M2S_VOLKH_SF_FPGA_GOLDEN_SIZE +
+				          M2S_VOLKH_SF_FPGA_UPDATE_SIZE,
 				.size   = M2S_VOLKH_SF_JFFS2_PART_SIZE,
 			},
 		};

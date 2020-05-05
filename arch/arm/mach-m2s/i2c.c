@@ -145,7 +145,6 @@ void __init m2s_i2c_init(void)
 	int p = m2s_platform_get();
 
 #if defined(CONFIG_M2S_MSS_I2C0)
-
 	/*
 	 * Reset the I2C controller and then bring it out of reset
 	 */
@@ -170,7 +169,7 @@ void __init m2s_i2c_init(void)
 	 */ 
 	if (p == PLATFORM_M2S_VOLKH) {
 		static struct max7301_platform_data m2s_volkh_max7300_info = {
-				.base = -1,
+			.base = -1,
 		};
 
 		static struct i2c_board_info __initdata m2s_volkh_i2c_dev0_info[] = {
@@ -193,7 +192,6 @@ void __init m2s_i2c_init(void)
 #endif /* CONFIG_M2S_MSS_I2C0 */
 
 #if defined(CONFIG_M2S_MSS_I2C1)
-
 	/*
 	 * Reset the I2C controller and then bring it out of reset
 	 */
@@ -231,29 +229,25 @@ void __init m2s_i2c_init(void)
 #endif /* CONFIG_EEPROM_AT24 */
 
 	}
-
 #endif /* CONFIG_M2S_MSS_I2C1 */
 
 #if defined(CONFIG_M2S_FPGA_I2C2)
-
-	/*
-	 * Pass the device parameters to the driver
-	 */
-	i2c_m2s_data_dev2.ref_clk = m2s_clock_get(CLCK_SYSREF);
-	platform_set_drvdata(&i2c_m2s_dev2, &i2c_m2s_data_dev2);
-
-	/*
-	 * Register a platform device for this interface
-	 */
-	platform_device_register(&i2c_m2s_dev2);
-
-	/*
-	 * Perform board-specific I2C device registration
-	 */
 	if (p == PLATFORM_M2S_VOLKH) {
+		/*
+		 * Pass the device parameters to the driver
+		 */
+		i2c_m2s_data_dev2.ref_clk = m2s_clock_get(CLCK_SYSREF);
+		platform_set_drvdata(&i2c_m2s_dev2, &i2c_m2s_data_dev2);
 
+		/*
+		 * Register a platform device for this interface
+		 */
+		platform_device_register(&i2c_m2s_dev2);
+
+		/*
+		 * Perform board-specific I2C device registration
+		 */
 	}
-
 #endif /* CONFIG_M2S_FPGA_I2C2 */
 
 } /* m2s_i2c_init() */
