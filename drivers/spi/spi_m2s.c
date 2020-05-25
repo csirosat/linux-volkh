@@ -249,28 +249,44 @@ static int spi_m2s_hw_init(struct m2s_spi_dsc *s)
 	 */
 	M2S_SYSREG->soft_reset_cr &= ~M2S_SYS_SOFT_RST_CR_PDMA;
 
+	/*
+	 * Reset the PDMA channels for RX and TX.
+	 */
 	M2S_PDMA(s)->chan[s->drx].control = PDMA_CONTROL_RESET |
 					    PDMA_CONTROL_CLR_B |
 					    PDMA_CONTROL_CLR_A;
-	M2S_PDMA(s)->chan[s->drx].control |= PDMA_CONTROL_WRITE_ADJ |
-					     PDMA_CONTROL_SRC_ADDR_INC_0 |
-					     PDMA_CONTROL_XFER_SIZE_1B;
-	M2S_PDMA(s)->chan[s->drx].control |= s->drx_sel |
-					     PDMA_CONTROL_PERIPH;
-	M2S_PDMA(s)->chan[s->drx].control |= PDMA_CONTROL_INTEN;
-
 	M2S_PDMA(s)->chan[s->dtx].control = PDMA_CONTROL_RESET |
 					    PDMA_CONTROL_CLR_B |
 					    PDMA_CONTROL_CLR_A;
-	M2S_PDMA(s)->chan[s->dtx].control |= PDMA_CONTROL_WRITE_ADJ |
-					     PDMA_CONTROL_DST_ADDR_INC_0 |
-					     PDMA_CONTROL_XFER_SIZE_1B;
-	M2S_PDMA(s)->chan[s->dtx].control |= s->dtx_sel |
-					     PDMA_CONTROL_DIR |
-					     PDMA_CONTROL_PERIPH;
+
+	/*
+	 * Take the PDMA channels out of reset.
+	*/
+	M2S_PDMA(s)->chan[s->drx].control = 0;
+	M2S_PDMA(s)->chan[s->dtx].control = 0;
+
+	/*
+	 * Set the PDMA channel control register fields.
+	 * DO NOT use back-to-back read-modify-writes to the control register.
+	 * With certain M3:APB clock ratios, there appears to be a delay
+	 * between when write data is committed, and when that data is
+	 * readable on a following read.  Perhaps this delay only applies
+	 * immediately after a channel reset, but this is not clear.
+	 */
+	M2S_PDMA(s)->chan[s->drx].control = s->drx_sel |
+					    PDMA_CONTROL_WRITE_ADJ |
+					    PDMA_CONTROL_SRC_ADDR_INC_0 |
+					    PDMA_CONTROL_INTEN |
+					    PDMA_CONTROL_XFER_SIZE_1B |
+					    PDMA_CONTROL_PERIPH;
 	/* Do not enable interrupts on the TX channel.
 	   Control completion of the transfer by the RX interrupt only. */
-	M2S_PDMA(s)->chan[s->dtx].control &= ~PDMA_CONTROL_INTEN;
+	M2S_PDMA(s)->chan[s->dtx].control = s->dtx_sel |
+					    PDMA_CONTROL_WRITE_ADJ |
+					    PDMA_CONTROL_DST_ADDR_INC_0 |
+					    PDMA_CONTROL_XFER_SIZE_1B |
+					    PDMA_CONTROL_DIR |
+					    PDMA_CONTROL_PERIPH;
 
 	return ret;
 }
@@ -547,6 +563,7 @@ static void spi_m2s_xfer_start(struct m2s_spi_dsc *s)
 	struct spi_device *dev = s->msg->spi;
 	int wb = (dev->bits_per_word + 7) / 8;
 	int len;
+	unsigned int chan_ctrl_reg;
 
 	if (s->xf == NULL) {
 		/* Should never come here. */
@@ -568,18 +585,23 @@ static void spi_m2s_xfer_start(struct m2s_spi_dsc *s)
 
 	/*
 	 * Set-up RX
+	 * DO NOT use back-to-back read-modify-writes to the control register.
+	 * See note in spi_m2s_hw_init() for more details.
 	 */
+
 	chan = &M2S_PDMA(s)->chan[s->drx];
 	brx = !!(chan->status & PDMA_STATUS_BUF_SEL);
+	chan_ctrl_reg = chan->control;
 	if (s->xf->rx_buf) {
 		p = s->xf->rx_buf;
-		chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
-		chan->control |= PDMA_CONTROL_DST_ADDR_INC_1;
+		chan_ctrl_reg &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
+		chan_ctrl_reg |= PDMA_CONTROL_DST_ADDR_INC_1;
 	} else {
 		p = &s->dummy;
-		chan->control &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
-		chan->control |= PDMA_CONTROL_DST_ADDR_INC_0;
+		chan_ctrl_reg &= ~PDMA_CONTROL_DST_ADDR_INC_MSK;
+		chan_ctrl_reg |= PDMA_CONTROL_DST_ADDR_INC_0;
 	}
+	chan->control = chan_ctrl_reg;
 	if (MSS_SPI_HW) {
 		chan->buf[brx].src = (u32)&M2S_MSS_SPI(s)->rx_data;
 	} else {
@@ -589,18 +611,22 @@ static void spi_m2s_xfer_start(struct m2s_spi_dsc *s)
 
 	/*
 	 * Set-up TX
+	 * DO NOT use back-to-back read-modify-writes to the control register.
+	 * See note in spi_m2s_hw_init() for more details.
 	 */
 	chan = &M2S_PDMA(s)->chan[s->dtx];
 	btx = !!(chan->status & PDMA_STATUS_BUF_SEL);
+	chan_ctrl_reg = chan->control;
 	if (s->xf->tx_buf) {
 		p = (void *)s->xf->tx_buf;
-		chan->control &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
-		chan->control |= PDMA_CONTROL_SRC_ADDR_INC_1;
+		chan_ctrl_reg &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
+		chan_ctrl_reg |= PDMA_CONTROL_SRC_ADDR_INC_1;
 	} else {
 		p = &s->dummy;
-		chan->control &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
-		chan->control |= PDMA_CONTROL_SRC_ADDR_INC_0;
+		chan_ctrl_reg &= ~PDMA_CONTROL_SRC_ADDR_INC_MSK;
+		chan_ctrl_reg |= PDMA_CONTROL_SRC_ADDR_INC_0;
 	}
+	chan->control = chan_ctrl_reg;
 	chan->buf[btx].src = (u32)p;
 	if (MSS_SPI_HW) {
 		chan->buf[btx].dst = (u32)&M2S_MSS_SPI(s)->tx_data;
