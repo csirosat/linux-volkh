@@ -8,6 +8,9 @@
  * Modified by Mike Pilawa <Mike.Pilawa@csiro.au> to allow the
  * driver to be used by CoreSPI controllers in the M2S FPGA fabric.
  *
+ * Modified by Grant Perry <grant.perry@csiro.au> to make the IRQ
+ * handler shareable, and not have possible unbounded looping.
+ *
  * The code contained herein is licensed under the GNU General Public
  * License. You may obtain a copy of the GNU General Public License
  * Version 2 or later at the following locations:
@@ -740,6 +743,26 @@ static irqreturn_t spi_m2s_irq_cb(int irq, void *ptr)
 	struct spi_transfer *xf;
 	int wb, i;
 
+	// iterrate though the spi table
+	for (i = 0; i < 8; i++) {
+		s = spi_m2s_dsc_tbl[i];
+		// If the table entry has been allocated this is a pdma channel that is controlled by us
+		// an unused table entry has drx == dtx == 0.
+		if (!(!s->drx && !s->dtx)) {
+			/*
+			 * If the pdma status bit for this spi table entry is set then we 
+			 * know who fired the interrupt. each pdma channel has two bits.
+			 * continue with the handler
+			 *
+			 * Else continue looping through till we find the right device
+			 */
+			if (M2S_PDMA(s)->status & (0x3 << (i * 2))) break;
+		}
+	}
+
+	// If `i >= 8` then none of our spi devices fired the pdma itnerrupt. exit.
+	if (i >= 8) return IRQ_NONE;
+
 	/*
 	 * This is somewhat hacky code resulting from the fact that
 	 * there is a single IRQ line shared by all PDMA channels.
@@ -747,8 +770,8 @@ static irqreturn_t spi_m2s_irq_cb(int irq, void *ptr)
 	 * refers to. Hence the below search to map a PDMA channel
 	 * to a corresponding SPI controller data structure.
 	 */
-	for (i = 0; ! (M2S_PDMA(s)->status & (0x3 << (i*2))); i++);
-	s = spi_m2s_dsc_tbl[i];
+	// for (i = 0; ! (M2S_PDMA(s)->status & (0x3 << (i*2))); i++);
+	// s = spi_m2s_dsc_tbl[i];
 
 	msg = s->msg;
 	xf = s->xf;
@@ -1057,7 +1080,7 @@ static int __devinit spi_m2s_probe(struct platform_device *pdev)
 	s->irq = irq;
 	if (spi_m2s_irq == -1) {
 		ret = request_irq(irq, spi_m2s_irq_cb,
-					0, dev_name(&pdev->dev), s);
+					IRQF_SHARED, dev_name(&pdev->dev), s);
 		if (ret) {
 			dev_err(&pdev->dev, "request irq %d failed for "
 				"SPI controller %d\n", irq, bus);
