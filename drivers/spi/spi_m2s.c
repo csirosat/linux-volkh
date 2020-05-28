@@ -135,6 +135,7 @@ struct m2s_spi_dsc {
 static void * spi_m2s_pdma_regs = NULL;
 static int spi_m2s_irq = -1;
 static struct m2s_spi_dsc *spi_m2s_dsc_tbl[8];
+static uint32_t pdma_channel_mask = 0;
 
 /*
  * Description of the the SmartFusion SPI hardware interfaces.
@@ -287,6 +288,11 @@ static int spi_m2s_hw_init(struct m2s_spi_dsc *s)
 					    PDMA_CONTROL_XFER_SIZE_1B |
 					    PDMA_CONTROL_DIR |
 					    PDMA_CONTROL_PERIPH;
+
+	/*
+	 * Set the channel mask for the PDMA RX
+	 */
+	pdma_channel_mask |= (0x3 << (s->drx * 2));
 
 	return ret;
 }
@@ -495,6 +501,11 @@ static void spi_m2s_hw_release(struct m2s_spi_dsc *s)
 	 */
 	M2S_PDMA(s)->chan[s->drx].control = PDMA_CONTROL_RESET;
 	M2S_PDMA(s)->chan[s->dtx].control = PDMA_CONTROL_RESET;
+
+	/*
+	 * Unmask this channel from the interrupt flags
+	 */
+	pdma_channel_mask &= ~(0x3 << (s->drx * 2));
 
 	/*
 	 * Disable the SPI controller
@@ -769,7 +780,15 @@ static irqreturn_t spi_m2s_irq_cb(int irq, void *ptr)
 	struct spi_transfer *xf;
 	int wb, i;
 
-	// iterrate though the spi table
+	/* 
+	 * GTFO early.
+	 * The channel mask is set/cleared by the init/cleanup functions for each spidevice.
+	 * this is a quick and easy way to find out if one of our devices was the initiator
+	 * of this IRQ.
+	 */
+	if (!(M2S_PDMA(s)->status & pdma_channel_mask)) return IRQ_NONE;
+
+	// iterrate though the spi table to find the our device.
 	for (i = 0; i < 8; i++) {
 		s = spi_m2s_dsc_tbl[i];
 		// If the table entry has been allocated this is a pdma channel that is controlled by us
