@@ -63,7 +63,7 @@ static struct platform_device i2c_m2s_dev0 = {
 };
 
 static struct i2c_a2f_data i2c_m2s_data_dev0 = {
-	.i2c_clk	= 100000,
+	.i2c_clk	= 105000,
 };
 
 #endif	/* CONFIG_M2S_MSS_I2C0 */
@@ -98,7 +98,7 @@ static struct platform_device i2c_m2s_dev1 = {
 };
 
 static struct i2c_a2f_data i2c_m2s_data_dev1 = {
-	.i2c_clk	= 100000,
+	.i2c_clk	= 105000,
 };
 
 #endif	/* CONFIG_M2S_MSS_I2C1 */
