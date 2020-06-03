@@ -41,7 +41,12 @@
 #include <mach/gpio.h>
 #include <mach/mmc.h>
 #include <mach/can.h>
+#include <mach/m2s.h>
 
+/*
+ * M2S System Reference clock.
+ * Global defined in arch/arm/mach-m2s/clock.c
+ */
 extern unsigned int m2s_clock_sysref;
 
 /*
@@ -84,28 +89,40 @@ EXPORT_SYMBOL(m2s_device_get);
 /*
  * User can (and should) define the platform from U-Boot
  */
-static int __init m2s_platform_parse(char *s)
+static int __init m2s_platform_parse(char *plat)
 {
-	/*
-	 * Should really have a cmdline arg from u-boot for this
-	 * but fixed by platform should suffice for now.
-	 */
-	m2s_clock_sysref = 142000000; // default
+	char *sysref;
+	unsigned int sysref_val;
 
-	if (!strcmp(s, "g4m-vb"))
+	/*
+	 * Find sysref in m2s_platform from cmdline, if it exists.
+	 */
+	if ((sysref = strchr(plat, ':')) != NULL)
+		*(sysref++) = '\0';
+
+	if (!strcmp(plat, "g4m-vb"))
 		m2s_platform = PLATFORM_G4M_VB;
-	else if (!strcmp(s, "m2s-som"))
+	else if (!strcmp(plat, "m2s-som"))
 		m2s_platform = PLATFORM_M2S_SOM;
-	else if (!strcmp(s, "sf2-dev-kit"))
+	else if (!strcmp(plat, "sf2-dev-kit"))
 		m2s_platform = PLATFORM_SF2_DEV_KIT;
-	else if (!strcmp(s, "m2s-fg484-som")) {
+	else if (!strcmp(plat, "m2s-fg484-som"))
 		m2s_platform = PLATFORM_M2S_FG484_SOM;
-		m2s_clock_sysref = 100000000;
-	}
-	else if (!strcmp(s, "m2s-volkh")) {
+	else if (!strcmp(plat, "m2s-volkh")) {
 		m2s_platform = PLATFORM_M2S_VOLKH;
-		m2s_clock_sysref = 100000000;
+		m2s_clock_sysref = M2S_SYSREF_VOLKH;
 	}
+
+	/*
+	 * Decode sysref in m2s_platform from cmdline, if it exists.
+	 */
+	if (sysref && strlen(sysref)) {
+		sysref_val = simple_strtoul(sysref, NULL, 10);
+		if (sysref_val)
+			m2s_clock_sysref = sysref_val;
+	}
+
+//	printk("m2s_clock_sysref=%u\n", m2s_clock_sysref);
 
 	return 1;
 }

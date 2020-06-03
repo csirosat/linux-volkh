@@ -34,8 +34,11 @@
 
 static unsigned int m2s_clock_pclk0;
 static unsigned int m2s_clock_pclk1;
-/* Set by m2s_platform.c : m2s_platform_parse() */
-unsigned int m2s_clock_sysref;
+/*
+ * Define the M2S System Reference clock.
+ * Defaulted here, but set properly in m2s_platform.c : m2s_platform_parse().
+ */
+unsigned int m2s_clock_sysref = M2S_SYSREF_DEFAULT;
 
 /*
  * Calculate the divisor for a specified FACC1 field

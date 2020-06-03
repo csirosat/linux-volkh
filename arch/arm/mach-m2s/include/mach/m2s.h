@@ -82,9 +82,10 @@ struct m2s_sysreg {
  * known way (as of yet) to read them in run time. Hence,
  * we define them as build-time constants
  */
-//#define CONFIG_SYS_M2S_SYSREF		142000000
+#define M2S_SYSREF_DEFAULT		142000000
+#define M2S_SYSREF_VOLKH		100000000
 /*
- * Now set by m2s_platform.c : m2s_platform_parse()
+ * Global m2s_clock_sysref set by m2s_platform.c : m2s_platform_parse()
  * rather than fixed #define constant.
  */
 
