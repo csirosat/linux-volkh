@@ -55,10 +55,9 @@ __setup("envm_debug=", envm_debug_setup);
 
 /*
  * This is the base of the eNVM region the user can access using
- * this driver. By default, we don't allow accessing 
- * the low part of the eNVM, where U-boot resides.
+ * this driver.
  */
-static ulong envm_base = (1024 * 128);
+static ulong envm_base = (1024 * 0);
 
 /*
  * User can change base of the accessible region
