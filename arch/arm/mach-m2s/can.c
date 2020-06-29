@@ -8,7 +8,7 @@
 #include <mach/platform.h>
 #include <mach/can.h>
 
-#if defined(CONFIG_CAN_M2S)
+#if defined(CONFIG_M2S_MSS_CAN)
 
 #define MSS_CAN_BASE        0x40015000
 #define MSS_CAN_RGSZ        (0x20)
@@ -57,12 +57,12 @@ static struct platform_device can_device = {
  };
  
  
-#endif /* CONFIG_CAN_M2S*/
+#endif /* CONFIG_M2S_MSS_CAN*/
 
 
 void __init m2s_can_init(void)
 {
-#if defined (CONFIG_CAN_M2S)
+#if defined (CONFIG_M2S_MSS_CAN)
     m2s_can_device_data.freq_apb = m2s_clock_get(CLCK_PCLK1);
     platform_set_drvdata(&can_device, &m2s_can_device_data);
     // Make platform device known to system 

@@ -26,24 +26,27 @@
 
 #include <mach/mmc.h>
 
-#if defined(CONFIG_MMC_SDHCI_IWAVE)
-
 /*
  * SDHCI IWAVE resources
  */
 
+#if defined(CONFIG_M2S_IWAVE_MMC)
 #define MMC_IWAVE_START	0x31000000
 #define MMC_IWAVE_END	0x310000FF
 #define MMC_IWAVE_IRQ	34
+#endif
 
+#if defined(CONFIG_M2S_IWAVE_SD)
 #define SD_IWAVE_START	0x31100000
 #define SD_IWAVE_END	0x311000FF
 #define SD_IWAVE_IRQ	35
+#endif
 
 /*
  * MMC/SD platform device resources
  */
 
+#if defined(CONFIG_M2S_IWAVE_MMC)
 static struct resource	mmc_iwave_resources[] = {
 	{
 		.start	= MMC_IWAVE_START,
@@ -55,7 +58,9 @@ static struct resource	mmc_iwave_resources[] = {
 		.flags	= IORESOURCE_IRQ,
 	}
 };
+#endif
 
+#if defined(CONFIG_M2S_IWAVE_SD)
 static struct resource	sd_iwave_resources[] = {
 	{
 		.start	= SD_IWAVE_START,
@@ -67,45 +72,54 @@ static struct resource	sd_iwave_resources[] = {
 		.flags	= IORESOURCE_IRQ,
 	}
 };
+#endif
 
 /*
  * MMC/SD platform device data
  */
 
+#if defined(CONFIG_M2S_IWAVE_MMC)
 static struct sdhci_iwave_platdata	mmc_iwave_platdata = {
 	.hw_name	= "m2s-mmc",
 };
+#endif
 
+#if defined(CONFIG_M2S_IWAVE_SD)
 static struct sdhci_iwave_platdata	sd_iwave_platdata = {
 	.hw_name	= "m2s-sd",
 };
+#endif
 
 /*
  * MMC/SD platform device instance
  */
 
+#if defined(CONFIG_M2S_IWAVE_MMC)
 static struct platform_device	mmc_iwave_dev = {
 	.name			= "sdhci-iwave",
 	.id				= 0,
 	.num_resources	= ARRAY_SIZE(mmc_iwave_resources),
 	.resource		= mmc_iwave_resources,
 };
+#endif
 
+#if defined(CONFIG_M2S_IWAVE_SD)
 static struct platform_device	sd_iwave_dev = {
 	.name			= "sdhci-iwave",
 	.id				= 1,
 	.num_resources	= ARRAY_SIZE(sd_iwave_resources),
 	.resource		= sd_iwave_resources,
 };
-
-#endif /* CONFIG_MMC_SDHCI_IWAVE */
+#endif
 
 void __init m2s_mmc_init(void)
 {
-#if defined(CONFIG_MMC_SDHCI_IWAVE)
+#if defined(CONFIG_M2S_IWAVE_MMC)
 	mmc_iwave_dev.dev.platform_data = &mmc_iwave_platdata;
 	platform_device_register(&mmc_iwave_dev);
+#endif
 
+#if defined(CONFIG_M2S_IWAVE_SD)
 	sd_iwave_dev.dev.platform_data = &sd_iwave_platdata;
 	platform_device_register(&sd_iwave_dev);
 #endif

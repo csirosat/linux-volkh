@@ -118,12 +118,19 @@ config M2S_FPGA_GPIO_ADDR
 	help
 	  Specify base address of SmartFusion2 Core GPIO block
 
-config M2S_MMC_IWAVE
+config M2S_IWAVE_MMC
 	depends on ARCH_M2S && MMC_SDHCI_IWAVE
-	bool "Enable iWave Systems MMC/SDHCI IP core"
+	bool "Enable iWave Systems MMC/SDHCI IP core for MMC device"
 	default n
 	help
-	  Include support for iWave Systems MMC/SDHCI IP core 
+	  Include support for iWave Systems MMC/SDHCI IP core for MMC device
+	  
+config M2S_IWAVE_SD
+	depends on ARCH_M2S && MMC_SDHCI_IWAVE
+	bool "Enable iWave Systems MMC/SDHCI IP core for SD card"
+	default n
+	help
+	  Include support for iWave Systems MMC/SDHCI IP core for SD card 
 	  
 config M2S_MSS_CAN
 	depends on ARCH_M2S && CAN_M2S

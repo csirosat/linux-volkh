@@ -10,6 +10,6 @@ obj-$(CONFIG_M2S_ETH)		+= eth.o
 obj-$(CONFIG_I2C_A2F)		+= i2c.o
 obj-$(CONFIG_M2S_MSS_USB)	+= usb.o
 obj-$(CONFIG_GPIOLIB)		+= gpio.o
-obj-$(CONFIG_M2S_MMC_IWAVE)	+= mmc.o
+obj-$(CONFIG_MMC_SDHCI_IWAVE)	+= mmc.o
 obj-$(CONFIG_CAN_M2S)		+= can.o
 obj-$(CONFIG_M2S_MSS_WDT)	+= wdt.o

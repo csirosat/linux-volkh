@@ -11,11 +11,13 @@
 #ifndef _MACH_M2S_CAN_H_
 #define _MACH_M2S_CAN_H_
 
+#include <linux/types.h>
 #include <linux/init.h>
 
 typedef struct m2s_can_platform_data {
 	uint32_t freq_apb;	
-};
+} m2s_can_platform_data_t;
+
 void __init m2s_can_init(void);
 
 #endif /* _MACH_M2S_CAN_H_ */
