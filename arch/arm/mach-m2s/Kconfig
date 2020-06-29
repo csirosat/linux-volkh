@@ -130,7 +130,14 @@ config M2S_MSS_CAN
 	bool "Enable MSS CAN Controller"
 	default n
 	help
-		Include support for the MSS CAN controller
+	  Include support for the MSS CAN controller
+
+config M2S_MSS_WDT
+	depends on ARCH_M2S && M2S_WATCHDOG
+	bool "Enable MSS Watchdog Timer"
+	default n
+	help
+	  Include support for the MSS Watchdog Timer
 
 endmenu
 

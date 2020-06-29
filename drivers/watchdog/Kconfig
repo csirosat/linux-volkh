@@ -300,6 +300,13 @@ config LPC2K_WATCHDOG
 
 	  Say N if you are unsure.
 
+config M2S_WATCHDOG
+	tristate "Microsemi Smartfusion2 Watchdog"
+	depends on ARCH_M2S
+	help
+	  Say Y here to include support for the Microsemi Smartfusion2 watchdog timer.
+	  This driver can be built as a module by choosing M.
+
 # AVR32 Architecture
 
 config AT32AP700X_WDT

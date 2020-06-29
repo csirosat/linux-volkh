@@ -41,6 +41,7 @@
 #include <mach/gpio.h>
 #include <mach/mmc.h>
 #include <mach/can.h>
+#include <mach/wdt.h>
 #include <mach/m2s.h>
 
 /*
@@ -181,11 +182,58 @@ static void __init m2s_init_irq(void)
 	nvic_init();
 }
 
+#define M2S_RESET_SOURCE_POWERUP	0
+#define M2S_RESET_SOURCE_CNTRLR_MSS	1
+#define M2S_RESET_SOURCE_CNTRLR_M3	2
+#define M2S_RESET_SOURCE_SOFT		3
+#define M2S_RESET_SOURCE_LOCKUP		4
+#define M2S_RESET_SOURCE_WATCHDOG	5
+#define M2S_RESET_SOURCE_USER_MSS	6
+#define M2S_RESET_SOURCE_USER_M3	7
+
+static char * m2s_reset_source_lut[] =
+{
+	[M2S_RESET_SOURCE_POWERUP]	= "Power-up",
+	[M2S_RESET_SOURCE_CNTRLR_MSS]	= "MSS controller",
+	[M2S_RESET_SOURCE_CNTRLR_M3]	= "M3 controller",
+	[M2S_RESET_SOURCE_SOFT]		= "Soft",
+	[M2S_RESET_SOURCE_LOCKUP]	= "M3 lockup",
+	[M2S_RESET_SOURCE_WATCHDOG]	= "Watchdog",
+	[M2S_RESET_SOURCE_USER_MSS]	= "MSS user",
+	[M2S_RESET_SOURCE_USER_M3]	= "M3 user",
+};
+
+/*
+ * Determine the last reset source/cause.
+ * Clear/re-arm the register, and print the register value & decoded string.
+ */
+static void __init m2s_reset_source(void)
+{
+	unsigned int reset_source = M2S_SYSREG->reset_source_cr;
+	char * reset_source_str = "UNKNOWN";
+	int i;
+
+	M2S_SYSREG->reset_source_cr = 0;
+
+	for (i = 0; i < sizeof(m2s_reset_source_lut)/sizeof(char *); i++)
+		if (reset_source == 1<<i) {
+			reset_source_str = m2s_reset_source_lut[i];
+			break;
+		}
+
+	printk(KERN_INFO "M2S Reset Cause: 0x%x = %s reset\n", reset_source, reset_source_str);
+}
+
 /*
  * M2S platform initialization.
  */
 static void __init m2s_init(void)
 {
+	/*
+	 * Print last reset source/cause
+	 */
+	m2s_reset_source();
+
 	/*
 	 * Configure the IOMUXes of SmartFusion2
 	 */
@@ -236,4 +284,7 @@ static void __init m2s_init(void)
 	m2s_can_init();
 #endif
 
+#if defined(CONFIG_M2S_WATCHDOG) || defined(CONFIG_M2S_WATCHDOG_MODULE)
+	m2s_init_wdt();
+#endif
 }
