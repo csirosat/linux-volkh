@@ -224,7 +224,7 @@ static long m2s_wdt_ioctl(struct file *file,
 	void __user *argp = (void __user *)arg;
 	int __user *p = argp;
 	unsigned long now = jiffies;
-	int new_timeout;
+	int new_value;
 
 	switch (cmd) {
 	case WDIOC_GETSUPPORT:
@@ -235,18 +235,29 @@ static long m2s_wdt_ioctl(struct file *file,
 	case WDIOC_GETBOOTSTATUS:
 		return put_user(0, p);
 
+	case WDIOC_SETOPTIONS:
+		if (get_user(new_value, p))
+			return -EFAULT;
+		d_printk(LOG_DEBUG, "Set-options received, value=0x%x\n",
+			(unsigned int)new_value);
+		if (new_value & WDIOS_DISABLECARD)
+			m2s_wdt_disable();
+		if (new_value & WDIOS_ENABLECARD)
+			m2s_wdt_enable();
+		return 0;
+
 	case WDIOC_KEEPALIVE:
 		m2s_wdt_private.next_expiry = now + timeout * HZ;
-		d_printk(LOG_DEBUG, "Keepalive received, now=0x%08x, next_expiry=0x%08x\n",
+		d_printk(LOG_DEBUG, "Keep-alive received, now=0x%08x, next_expiry=0x%08x\n",
 			(unsigned int)now, (unsigned int)m2s_wdt_private.next_expiry);
 		return 0;
 
 	case WDIOC_SETTIMEOUT:
-		if (get_user(new_timeout, p))
+		if (get_user(new_value, p))
 			return -EFAULT;
-		timeout = new_timeout;
+		timeout = new_value;
 		m2s_wdt_private.next_expiry = now + timeout * HZ;
-		/* then return current value via case WDIOC_GETTIMEOUT below */
+		return put_user(timeout, p);
 
 	case WDIOC_GETTIMEOUT:
 		return put_user(timeout, p);
