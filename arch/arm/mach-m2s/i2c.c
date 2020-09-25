@@ -185,6 +185,9 @@ void __init m2s_i2c_init(void)
 			{
 				I2C_BOARD_INFO("ads7828", 0x4A)
 			},
+			{
+				I2C_BOARD_INFO("ds1337", 0x68)
+			},
 		};
 
 		i2c_register_board_info(0, &m2s_volkh_i2c_dev0_info[0], ARRAY_SIZE(m2s_volkh_i2c_dev0_info));
