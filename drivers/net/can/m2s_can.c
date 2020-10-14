@@ -550,6 +550,10 @@ static int m2s_process_rx(struct net_device *ndev, int mailbox)
         CDBG(KERN_INFO "%s: packet received successfully", __func__);
     }
     done++;
+
+    // clear the data registers for this mailbox
+    writel(0, &M2S_CAN_REG(prv)->rx_msg[mailbox].DATALOW);
+    writel(0, &M2S_CAN_REG(prv)->rx_msg[mailbox].DATAHIGH);
     
     /*
      * Ack mail-box
@@ -557,8 +561,6 @@ static int m2s_process_rx(struct net_device *ndev, int mailbox)
     writel(val | M2S_CAN_RX_MSGAV, &M2S_CAN_REG(prv)->rx_msg[mailbox].RXB.L);
     
     // clear the data registers for this mailbox
-    writel(0, &M2S_CAN_REG(prv)->rx_msg[mailbox].DATALOW);
-    writel(0, &M2S_CAN_REG(prv)->rx_msg[mailbox].DATAHIGH);
 
     
     return done;
