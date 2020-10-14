@@ -557,11 +557,11 @@ void __init m2s_spi_init(void)
 		 * SPI user-space interface (resides at SPI1,CS0)
 		 */
 		{
-			.modalias      = "slinky",
-			.max_speed_hz  = 4200000, // The next clock increment above 4MHz is 4.16MHz
+			.modalias      = "spidev",
+			.max_speed_hz  = 25000000,
 			.bus_num       = 1,
 			.chip_select   = 0,
-			.mode          = SPI_MODE_1,
+			.mode          = SPI_MODE_0,
 		},
 #endif /* CONFIG_M2S_MSS_SPI1 && CONFIG_SPI_SPIDEV */
 
