@@ -1621,6 +1621,14 @@ static void shrink_zone(int priority, struct zone *zone,
 					  &reclaim_stat->nr_saved_scan[l]);
 	}
 
+	/*
+	 * If the page cache is too big then focus on page cache
+	 * and ignore anonymous pages
+	 */
+	if (sc->may_swap && zone_page_state(zone, NR_FILE_PAGES)
+			> zone->max_pagecache_pages)
+		sc->may_swap = 0;
+
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
 					nr[LRU_INACTIVE_FILE]) {
 		for_each_evictable_lru(l) {

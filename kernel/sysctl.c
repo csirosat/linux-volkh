@@ -1281,6 +1281,17 @@ static struct ctl_table vm_table[] = {
 		.extra2		= &one,
 	},
 #endif
+	{
+//		.ctl_name	= VM_PAGECACHE_RATIO,
+		.procname	= "pagecache_ratio",
+		.data		= &sysctl_pagecache_ratio,
+		.maxlen		= sizeof(sysctl_pagecache_ratio),
+		.mode		= 0644,
+		.proc_handler	= &sysctl_pagecache_ratio_sysctl_handler,
+//		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+		.extra2		= &one_hundred,
+	},
 
 /*
  * NOTE: do not add new entries to this table unless you have read
