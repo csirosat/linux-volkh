@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
+#include <linux/rtc/ds1307.h>
 #include <linux/string.h>
 #include <linux/rtc.h>
 #include <linux/bcd.h>
@@ -31,6 +32,7 @@ enum ds_type {
 	ds_1338,
 	ds_1339,
 	ds_1340,
+    ds_1342,
 	ds_1388,
 	ds_3231,
 	m41t00,
@@ -81,8 +83,13 @@ enum ds_type {
 #	define DS1340_M_CALIBRATION	0x1f
 #define DS1340_REG_FLAG		0x09
 #	define DS1340_BIT_OSF		0x80
-#define DS1337_REG_STATUS	0x0f
+#define DS1337_REG_CONTROL_STATUS	0x0f		/* or ds1341/42 */
 #	define DS1337_BIT_OSF		0x80
+#	define DS1342_BIT_DOSF     	0x40
+#	define DS1342_BIT_LOS     	0x20
+#	define DS1342_BIT_CLKSEL2	0x10
+#	define DS1342_BIT_CLKSEL1	0x08
+#	define DS1342_BIT_ECLK		0x04
 #	define DS1337_BIT_A2I		0x02
 #	define DS1337_BIT_A1I		0x01
 #define DS1339_REG_ALARM1_SECS	0x07
@@ -132,6 +139,9 @@ static const struct chip_desc chips[] = {
 },
 [ds_1340] = {
 },
+[ds_1342] = {
+	.alarm		= 1,
+},
 [ds_3231] = {
 	.alarm		= 1,
 },
@@ -147,6 +157,7 @@ static const struct i2c_device_id ds1307_id[] = {
 	{ "ds1339", ds_1339 },
 	{ "ds1388", ds_1388 },
 	{ "ds1340", ds_1340 },
+    { "ds1342", ds_1342 },
 	{ "ds3231", ds_3231 },
 	{ "m41t00", m41t00 },
 	{ "rx8025", rx_8025 },
@@ -252,13 +263,13 @@ static void ds1307_work(struct work_struct *work)
 	lock = &ds1307->rtc->ops_lock;
 
 	mutex_lock(lock);
-	stat = i2c_smbus_read_byte_data(client, DS1337_REG_STATUS);
+	stat = i2c_smbus_read_byte_data(client, DS1337_REG_CONTROL_STATUS);
 	if (stat < 0)
 		goto out;
 
 	if (stat & DS1337_BIT_A1I) {
 		stat &= ~DS1337_BIT_A1I;
-		i2c_smbus_write_byte_data(client, DS1337_REG_STATUS, stat);
+		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL_STATUS, stat);
 
 		control = i2c_smbus_read_byte_data(client, DS1337_REG_CONTROL);
 		if (control < 0)
@@ -357,6 +368,7 @@ static int ds1307_set_time(struct device *dev, struct rtc_time *t)
 	switch (ds1307->type) {
 	case ds_1337:
 	case ds_1339:
+    case ds_1342:
 	case ds_3231:
 		buf[DS1307_REG_MONTH] |= DS1337_BIT_CENTURY;
 		break;
@@ -628,11 +640,13 @@ static int __devinit ds1307_probe(struct i2c_client *client,
 	int			tmp;
 	const struct chip_desc	*chip = &chips[id->driver_data];
 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
+    struct ds1342_platform_data *ds1342_pdata = client->dev.platform_data;
 	int			want_irq = false;
 	unsigned char		*buf;
 	static const int	bbsqi_bitpos[] = {
 		[ds_1337] = 0,
 		[ds_1339] = DS1339_BIT_BBSQI,
+        [ds_1342] = 0,
 		[ds_3231] = DS3231_BIT_BBSQW,
 	};
 
@@ -659,6 +673,12 @@ static int __devinit ds1307_probe(struct i2c_client *client,
 	}
 
 	switch (ds1307->type) {
+    case ds_1342:
+        tmp = 0;
+        if (ds1342_pdata->dosf) tmp |= DS1342_BIT_DOSF;
+        if (ds1342_pdata->eclk) tmp |= DS1342_BIT_ECLK;
+        tmp |= (ds1342_pdata->clksel & 0x03) << 3;
+        i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL_STATUS, tmp);
 	case ds_1337:
 	case ds_1339:
 	case ds_3231:
@@ -695,7 +715,7 @@ static int __devinit ds1307_probe(struct i2c_client *client,
 
 		/* oscillator fault?  clear flag, and warn */
 		if (ds1307->regs[1] & DS1337_BIT_OSF) {
-			i2c_smbus_write_byte_data(client, DS1337_REG_STATUS,
+			i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL_STATUS,
 				ds1307->regs[1] & ~DS1337_BIT_OSF);
 			dev_warn(&client->dev, "SET TIME!\n");
 		}
@@ -832,6 +852,7 @@ read_rtc:
 	case rx_8025:
 	case ds_1337:
 	case ds_1339:
+    case ds_1342:
 	case ds_1388:
 	case ds_3231:
 		break;

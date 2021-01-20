@@ -26,6 +26,7 @@
 #include <linux/irq.h>
 #include <linux/serial_8250.h>
 #include <linux/i2c.h>
+#include <linux/rtc/ds1307.h>
 #include <linux/spi/max7301.h>
 #include <mach/m2s.h>
 #include <mach/platform.h>
@@ -171,6 +172,12 @@ void __init m2s_i2c_init(void)
 		static struct max7301_platform_data m2s_volkh_max7300_info = {
 			.base = -1,
 		};
+        
+        static struct ds1342_platform_data m2s_volkh_ds1342_info = {
+			.dosf = 0,
+            .eclk = 1,      //external clock input enabled (1PPS)
+            .clksel = 0,    //input clock frequency is 1Hz
+		};
 
 		static struct i2c_board_info __initdata m2s_volkh_i2c_dev0_info[] = {
 			{
@@ -186,7 +193,10 @@ void __init m2s_i2c_init(void)
 				I2C_BOARD_INFO("ads7828", 0x4A)
 			},
 			{
-				I2C_BOARD_INFO("ds1337", 0x68)
+				//I2C_BOARD_INFO("ds1337", 0x68)
+                .type          = "ds1342",
+				.addr          = 0x68,
+				.platform_data = &m2s_volkh_ds1342_info,
 			},
 		};
 
