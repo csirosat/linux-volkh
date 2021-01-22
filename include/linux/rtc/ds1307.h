@@ -1,5 +1,5 @@
-#ifndef __LINUX_SPI_DS1307_H
-#define __LINUX_SPI_DS1307_H
+#ifndef __LINUX_RTC_DS1307_H
+#define __LINUX_RTC_DS1307_H
 
 /*
  * External clock input configuration for ds1341/42 RTC chips.
@@ -13,4 +13,4 @@ struct ds1342_platform_data {
     int clksel;
 };
 
-#endif /* __LINUX_SPI_DS1307_H */
+#endif /* __LINUX_RTC_DS1307_H */
