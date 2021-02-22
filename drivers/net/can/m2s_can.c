@@ -14,6 +14,7 @@
 
 #include <linux/can.h>
 #include <linux/can/dev.h>
+#include <linux/can/error.h>
 
 #include <linux/err.h>
 #include <linux/io.h>
@@ -110,11 +111,25 @@ MODULE_PARM_DESC(dev_major, "Device driver major number");
 #define M2S_CAN_SET_EXT(_val)       (_val | M2S_CAN_IDE)
 #define M2S_CAN_SET_STD(_val)       (_val & ~M2S_CAN_IDE)
 #define M2S_CAN_SET_ID(_id)         (((_id) & 0x1FFFFFFF) << 3)
-#define M2S_CAN_SET_IDE(_id)         (((_id) & 0x1FFFFFFF) << 3)
-#define M2S_CAN_SET_IDS(_id)         (((_id) & 0x7FF) << 21)
+#define M2S_CAN_SET_IDE(_id)        (((_id) & 0x1FFFFFFF) << 3)
+#define M2S_CAN_SET_IDS(_id)        (((_id) & 0x7FF) << 21)
 #define M2S_CAN_GET_ID(_reg)        ((_reg >> 3) & 0x1FFFFFFF)
-#define M2S_CAN_GET_IDE(_reg)        ((_reg >> 3) & 0x1FFFFFFF)
-#define M2S_CAN_GET_IDS(_reg)        ((_reg >> 21) & 0x7FF)
+#define M2S_CAN_GET_IDE(_reg)       ((_reg >> 3) & 0x1FFFFFFF)
+#define M2S_CAN_GET_IDS(_reg)       ((_reg >> 21) & 0x7FF)
+
+/* Error Status Register Field Macros */ 
+#define M2S_CAN_GET_TX_CNT(_val)		(_val & 0xFF)
+#define M2S_CAN_GET_RX_CNT(_val)		((_val >> 8) & 0xFF)
+#define M2S_CAN_GET_ERR_STATE(_val)		((_val >> 16) & 0x3)	
+#define M2S_CAN_ESR_ACTIVE				0
+#define M2S_CAN_ESR_PASSIVE				1
+#define M2S_CAN_ESR_RXGTE96(_val)		((_val >> 19) & 1)
+#define M2S_CAN_ESR_TXGTE69(_val)		((_val >> 18) & 1)
+#define M2S_CAN_GET_WARNING(_val)		((_val >> 18) & 0x3)
+#define M2S_CAN_ESR_BOFF(_val)			((_val >> 17) & 1) 
+
+#define ERR_BYTE(_val, _byte)			(_val << (8*_byte))
+
 /* Tx Mailbox Command/Control Fields */ 
 #define M2S_CAN_TXINTEN     (1 << 2)
 #define M2S_CAN_TXABRT      (1 << 1)
@@ -148,8 +163,9 @@ MODULE_PARM_DESC(dev_major, "Device driver major number");
 #define M2S_INT_OVRLOAD     (1 << 3)
 #define M2S_INT_ARBLOSS     (1 << 2)
 #define M2S_INT_GLOBAL      (1 << 0) // only applies to enable register
-#define M2S_INT_ERRS        (M2S_INT_BUSOFF | M2S_INT_CRCERR | M2S_INT_FORMERR | M2S_INT_ACKERR | M2S_INT_STUFFERR | M2S_INT_BITERR | M2S_INT_OVRLOAD | M2S_INT_ARBLOSS)
-
+#define M2S_INT_ERRS        ( M2S_INT_SSTFAIL | M2S_INT_STUCK | M2S_INT_RTR | M2S_INT_BUSOFF | \
+							M2S_INT_CRCERR | M2S_INT_FORMERR | M2S_INT_ACKERR | \
+							M2S_INT_STUFFERR | M2S_INT_BITERR | M2S_INT_OVRLOAD | M2S_INT_ARBLOSS )
 
 // Register access macros 
 #define M2S_CAN_REG(d)      ((volatile struct m2s_can_cfg_regs *)d->reg)
@@ -157,7 +173,6 @@ MODULE_PARM_DESC(dev_major, "Device driver major number");
 /******************************************************************************
  * Local variables and function prototypes
  ******************************************************************************/
- //--------------------------define M2S CAN Device Descriptor
 /*
  * M2S CAN Device descriptor 
  */
@@ -169,7 +184,6 @@ struct m2s_can_dev {
     struct  device              *dev;
     struct  napi_struct         napi;
     spinlock_t mbx_lock; // Mailbox registers need protection
-    u32			rx_next;
 };
  
 /*
@@ -415,7 +429,7 @@ static int m2s_chip_init(struct m2s_can_dev *prv)
     val = readl(&M2S_CAN_REG(prv)->cmd);
     
     // output CAN revision_ctrl register for major, minor and rev number
-    printk(KERN_ALERT "%s: driver %s ver major %d minor %d rev %d, mode 0x%x\n",
+    printk(KERN_INFO "%s: driver %s ver major %d minor %d rev %d, mode 0x%x\n",
 		       __func__, DRV_NAME, (val & 0xF0000000) >> 28, (val & 0x0F000000) >> 24, (val & 0x00FF0000) >> 16, val);
     
     // Disable interrupts
@@ -453,7 +467,7 @@ static int m2s_chip_start(struct net_device *ndev)
     writel(M2S_CAN_RX_ENABLE & ~M2S_CAN_RX_LF, &M2S_CAN_REG(prv)->rx_msg[i].RXB.L);
     
     // Enable interrupt types
-    val = M2S_INT_RXMSG | M2S_INT_TXMSG | M2S_INT_RXLOST | M2S_INT_BUSOFF | M2S_INT_GLOBAL;
+    val = M2S_INT_RXMSG | M2S_INT_TXMSG | M2S_INT_RXLOST | M2S_INT_BUSOFF | M2S_INT_GLOBAL | M2S_INT_ERRS;
     // val = M2S_INT_TXMSG | M2S_INT_RXLOST | M2S_INT_BUSOFF | M2S_INT_GLOBAL;
     writel(val, &M2S_CAN_REG(prv)->int_en);
     CDBG(KERN_ALERT "%s: Exit driver %s \n", __func__, DRV_NAME);    
@@ -471,6 +485,309 @@ static int m2s_chip_stop(struct net_device *ndev)
     writel(val |= M2S_CAN_CMD_RUNSTOP, &M2S_CAN_REG(prv)->cmd);
  
     return 0;
+}
+
+/* Update CAN private data state and stats */ 
+static void m2s_error_state(struct net_device *ndev, struct can_frame *cf, enum can_state new_state, u32 esr)
+{
+	struct m2s_can_dev *prv = netdev_priv(ndev);
+    struct net_device_stats *stats = &ndev->stats;
+	int tec, rec;
+    u32 val;
+	
+    tec = M2S_CAN_GET_TX_CNT(esr);
+    rec = M2S_CAN_GET_RX_CNT(esr);
+    
+    stats->tx_errors =  tec;
+    
+    if (new_state != CAN_STATE_BUS_OFF)
+        stats->rx_errors = rec;
+	
+	switch(prv->can.state)
+	{
+	case CAN_STATE_ERROR_ACTIVE:
+		if (new_state >= CAN_STATE_ERROR_WARNING &&
+			new_state <= CAN_STATE_BUS_OFF)
+		{
+			prv->can.can_stats.error_warning++;
+		}
+	case CAN_STATE_ERROR_WARNING:				                /* fall through */
+	// going from WARNING to ERROR_PASSIVE or BUS_OFF 
+		if (new_state >= CAN_STATE_ERROR_PASSIVE &&
+			new_state <= CAN_STATE_BUS_OFF) 
+		{
+			prv->can.can_stats.error_passive++;
+		}
+		break; 
+	case CAN_STATE_ERROR_PASSIVE:
+
+	case CAN_STATE_BUS_OFF:
+	// going from BUS_OFF to ERROR_ACTIVE/WARNING/PASSIVE
+		if (new_state <= CAN_STATE_ERROR_PASSIVE)
+		{
+			cf->can_id |= CAN_ERR_RESTARTED;
+			prv->can.can_stats.restarts++;
+			
+			netif_carrier_on(ndev);
+			netif_wake_queue(ndev);
+			
+			// re-enable interrupts 
+			val = readl(&M2S_CAN_REG(prv)->int_en);
+			writel(val | (M2S_INT_ERRS), &M2S_CAN_REG(prv)->int_en);	
+		}
+		break;
+	default: 
+		break;
+	}
+	
+	if (prv->can.state == new_state)
+		return;
+	
+	switch(new_state)
+	{
+	case CAN_STATE_ERROR_ACTIVE: 
+		break;
+	
+	case CAN_STATE_ERROR_WARNING:
+		break;
+	
+	case CAN_STATE_ERROR_PASSIVE:
+		break;
+	
+	case CAN_STATE_BUS_OFF:
+    
+        printk(KERN_INFO "%s %s: Setting CAN state to BUS OFF\n", DRV_NAME, __func__);
+		can_bus_off(ndev);
+
+		// turn off chip if no restart
+		if (!prv->can.restart_ms) 
+		{
+            printk(KERN_ERR "%s %s: In BUS OFF state, stopped M2S CAN controller\n", DRV_NAME, __func__);
+			m2s_chip_stop(ndev);
+			return;
+		}
+    default: 
+        break;
+	}
+	
+}
+
+/* Handle the error interrupts and generate error CAN frames */ 
+static int m2s_error_handling(struct net_device *ndev, u32 int_status)
+{
+    struct net_device_stats *stats = &ndev->stats;
+    struct m2s_can_dev *prv = netdev_priv(ndev);
+    struct can_frame *cf;
+    struct sk_buff *skb;
+	int done = 0;
+	u32 error_code, error_class, esr, int_en;
+	enum can_state new_state;
+	
+	error_code = 0;
+	error_class = 0; 
+	
+    int_en = readl(&M2S_CAN_REG(prv)->int_en);
+	esr = readl(&M2S_CAN_REG(prv)->err_status);
+	printk(KERN_INFO "%s %s: ESR 0x%08x", DRV_NAME, __func__, esr);
+
+	// A node is 'bus off' when the TRANSMIT ERROR COUNT is >= 256
+	
+	// An 'error passive' node becomes 'error active' again when BOTH the 
+	// TRANSMIT ERROR COUNT and the RECEIVER ERROR COUNT are <= 127
+	
+	// A node which is 'bus off' is permitted to become 'error active' (no longer 'bus off')
+	// with its error counts BOTH set to 0 after 128 occurrence of 11 consecutive recessive bits 
+	// have been monitored on the bus 
+	
+	if (!M2S_CAN_GET_WARNING(esr))
+		new_state = CAN_STATE_ERROR_ACTIVE;
+	else                                // if error count > 96 	
+	{
+		switch(M2S_CAN_GET_ERR_STATE(esr))
+		{
+			case M2S_CAN_ESR_ACTIVE: 			// 96 < err_count <= 127 
+				new_state = CAN_STATE_ERROR_WARNING;
+				error_class |= CAN_ERR_CRTL;
+				
+				if M2S_CAN_ESR_RXGTE96(esr)
+					error_code |= ERR_BYTE(CAN_ERR_CRTL_RX_WARNING, 1);
+				if M2S_CAN_ESR_TXGTE69(esr)
+					error_code |= ERR_BYTE(CAN_ERR_CRTL_TX_WARNING, 1);
+					
+				break;
+			case M2S_CAN_ESR_PASSIVE: 			// 127 < err_count < 256
+				new_state = CAN_STATE_ERROR_PASSIVE;
+				error_class |= CAN_ERR_CRTL;
+				
+				if (M2S_CAN_GET_RX_CNT(esr) >> 7)
+					error_code |= ERR_BYTE(CAN_ERR_CRTL_RX_PASSIVE, 1);
+				if (M2S_CAN_GET_TX_CNT(esr) >> 7)
+					error_code |= ERR_BYTE(CAN_ERR_CRTL_TX_PASSIVE, 1);
+				
+				break;
+			default:
+				if (M2S_CAN_ESR_BOFF(esr)) 		// err_count >= 256
+                {
+					new_state = CAN_STATE_BUS_OFF;
+                    error_class |= CAN_ERR_BUSOFF;
+                }
+				else 
+					new_state = prv->can.state;
+		}
+	}
+		
+	// Set error codes for error CAN frames 
+	if (int_status & M2S_INT_BUSOFF)
+	{
+		printk(KERN_ERR "%s %s: The CAN controller entered the bus-off error state\n", DRV_NAME, __func__);
+        // error_class set along with can device new_state switch case 
+        
+        // disable error interrupts 
+        int_en &= ~(M2S_INT_BUSOFF);
+	}
+	
+	if (int_status & M2S_INT_CRCERR)
+	{
+		printk(KERN_ERR "%s %s: A CAN CRC error was detected\n", DRV_NAME, __func__);
+		error_class |= CAN_ERR_PROT;
+		error_code |= ERR_BYTE(CAN_ERR_PROT_UNSPEC, 2);
+        
+        // disable error interrupts 
+        int_en &= ~(M2S_INT_CRCERR);
+		
+	}
+	if (int_status & M2S_INT_FORMERR)
+	{
+		printk(KERN_ERR "%s %s: A CAN format error was detected\n", DRV_NAME, __func__);   
+		
+		error_class |= CAN_ERR_PROT;
+		error_code |= ERR_BYTE(CAN_ERR_PROT_FORM, 2);
+        
+        // disable error interrupts 
+		int_en &= ~(M2S_INT_FORMERR);
+		
+	}			
+	if (int_status & M2S_INT_ACKERR)
+	{
+		printk(KERN_ERR "%s %s: A CAN message acknowledgement error was detected\n", DRV_NAME, __func__);  
+		error_class |= CAN_ERR_ACK;
+        
+		// disable ack error interrupts 
+		int_en &= ~(M2S_INT_ACKERR);      
+	}			
+	if (int_status & M2S_INT_STUFFERR)
+	{
+		printk(KERN_ERR "%s %s: A CAN bit stuffing error is detected\n", DRV_NAME, __func__);
+		error_class |= CAN_ERR_PROT;
+		error_code |= ERR_BYTE(CAN_ERR_PROT_STUFF, 2);		
+        
+        // disable error interrupts 
+		int_en &= ~(M2S_INT_STUFFERR);  
+	}
+	if (int_status & M2S_INT_BITERR)
+	{
+		printk(KERN_ERR "%s %s: A CAN bit error is detected\n", DRV_NAME, __func__);        
+		error_class |= CAN_ERR_PROT;
+		error_code |= ERR_BYTE(CAN_ERR_PROT_BIT, 2);
+
+        // disable error interrupts 
+		int_en &= ~(M2S_INT_BITERR);        
+		
+	}
+	if (int_status & M2S_INT_OVRLOAD)
+	{
+		printk(KERN_ERR "%s %s: A CAN overload message is detected\n", DRV_NAME, __func__); 
+		error_class |= CAN_ERR_PROT;
+		error_code |= ERR_BYTE(CAN_ERR_PROT_OVERLOAD, 2);
+        
+        // disable error interrupts 
+		int_en &= ~(M2S_INT_OVRLOAD);  
+        
+	}			
+	if (int_status & M2S_INT_ARBLOSS)
+	{
+		printk(KERN_ERR "%s %s: Message arbitration was lost while sending a message\n", DRV_NAME, __func__);         
+		error_class |= CAN_ERR_LOSTARB;
+        error_code |= ERR_BYTE(CAN_ERR_LOSTARB_UNSPEC, 0);
+        
+        // disable error interrupts 
+		int_en &= ~(M2S_INT_ARBLOSS);
+	}			
+
+
+    if (int_status & M2S_INT_SSTFAIL)
+	{
+        printk(KERN_ERR "%s %s: A buffer set for single shot transmission experienced an arbitration loss or a bus error during transmission\n", DRV_NAME, __func__);
+        
+        // disable error interrupts 
+        int_en &= ~(M2S_INT_SSTFAIL);
+	}
+    if (int_status & M2S_INT_STUCK)
+	{
+        printk(KERN_ERR "%s %s: Stuck at dominant error, RX input remains stuck at 0 for more than 11 consecutive bit times\n", DRV_NAME, __func__);
+		error_class |= CAN_ERR_CRTL;
+        error_code |= ERR_BYTE(CAN_ERR_CRTL_UNSPEC, 1);
+        
+        // disable error interrupts 
+        int_en &= ~(M2S_INT_STUCK);
+	}
+    if (int_status & M2S_INT_RTR)
+	{
+        printk(KERN_ERR "%s %s: A RTR auto-reply message was sent\n", DRV_NAME, __func__);
+        
+        // disable error interrupts 
+        int_en &= ~(M2S_INT_RTR);
+	}
+    
+    writel(int_en, &M2S_CAN_REG(prv)->int_en);	
+		
+    // allocate a generic buff which marks the buffer as a CAN frame
+    // and lets "cf" point to the can_frame struct	
+	skb = dev_alloc_skb(sizeof(struct can_frame));
+	//skb = alloc_can_err_skb(ndev, &cf);
+    
+	CDBG(KERN_INFO "%s: allocated %d bytes for error can_frame socket buffer\n", __func__, sizeof(struct can_frame));
+	
+    if (!skb) 
+	{
+        stats->rx_dropped++;
+        printk(KERN_ERR "%s %s: alloc_can_skb() for can error frame failed!\n", DRV_NAME, __func__);
+        return 0;
+    }	
+
+	// assign identifier 
+    cf = (struct can_frame *)skb_put(skb, sizeof(struct can_frame));
+	
+	cf->can_id = CAN_ERR_FLAG | error_class;
+	// cf->can_id |= error_class;
+	*(u32 *)(cf->data + 0) = 0;
+	*(u32 *)(cf->data + 4) = error_code;  
+
+	m2s_error_state(ndev, cf, new_state, esr);
+
+	printk(KERN_INFO "%s %s: ERR FRAME data = 0x%08X CAN_ERR_DLC = %d, CAN_ID = 0x%08X\n", DRV_NAME, __func__, *(u32 *)(cf->data + 4), CAN_ERR_DLC, cf->can_id);
+	// assign data length code to can frame
+	cf->can_dlc = CAN_ERR_DLC;
+	skb->dev = ndev;
+	skb->protocol = htons(ETH_P_CAN);
+	skb->pkt_type = PACKET_BROADCAST;
+	skb->ip_summed =  CHECKSUM_UNNECESSARY;	
+	
+
+	/*
+	* Push packet to the upper layer
+	*/
+    // pass the buffer up to the protocol layers
+    if (netif_rx(skb) == NET_RX_SUCCESS) {
+        CDBG(KERN_INFO "%s: error frame received successfully", __func__);
+    }
+	
+    stats->rx_packets++;
+    stats->rx_bytes += cf->can_dlc;   	
+	
+    done++;	
+	
+	return done;
 }
 
 
@@ -493,7 +810,7 @@ static int m2s_process_rx(struct net_device *ndev, int mailbox)
     
     if (!skb) {
         stats->rx_dropped++;
-        printk(KERN_INFO "%s: alloc_can_skb() failed!\n", __func__);
+        printk(KERN_ERR "%s %s: alloc_can_skb() failed!\n", DRV_NAME, __func__);
         return 0;
     }
     
@@ -504,7 +821,7 @@ static int m2s_process_rx(struct net_device *ndev, int mailbox)
     numbytes = M2S_CAN_GET_DLC(val);
     cf->can_dlc = get_can_dlc(numbytes);
     
-    // assigned identifier
+    // assign identifier
     id = readl(&M2S_CAN_REG(prv)->rx_msg[mailbox].ID.L);
     CDBG(KERN_INFO "%s: rx_msg[%d].ID=0x%08X\n", __func__, mailbox, id);  
     
@@ -525,13 +842,11 @@ static int m2s_process_rx(struct net_device *ndev, int mailbox)
         low = readl(&M2S_CAN_REG(prv)->rx_msg[mailbox].DATALOW); // bytes 7:4
         high = readl(&M2S_CAN_REG(prv)->rx_msg[mailbox].DATAHIGH); // bytes 3:0
 
-
         *(u32 *)(cf->data + 0) = high;
         *(u32 *)(cf->data + 4) = low;    
 
         CDBG(KERN_INFO "%s: rxb[%d] ID=0x%08x datahigh=0x%08x datalow=0x%08x", __func__, mailbox, cf->can_id, high, low);
         CDBG(KERN_INFO "%s: numbytes=%d can_dlc=%d\n",__func__, numbytes, cf->can_dlc);
-        
     }
     
     /*
@@ -560,9 +875,6 @@ static int m2s_process_rx(struct net_device *ndev, int mailbox)
      */
     writel(val | M2S_CAN_RX_MSGAV, &M2S_CAN_REG(prv)->rx_msg[mailbox].RXB.L);
     
-    // clear the data registers for this mailbox
-
-    
     return done;
 }
 
@@ -576,6 +888,8 @@ static irqreturn_t m2s_irq(int irq, void *dev_id)
     
     // Read INT_STATUS register
     int_status = readl(&M2S_CAN_REG(prv)->status);
+	
+	CDBG(KERN_INFO "%s %s: INT_STATUS 0x%08x", DRV_NAME, __func__, int_status);
     
     // Clear interrupts ASAP
     writel(0xFFFF, &M2S_CAN_REG(prv)->status);   
@@ -591,8 +905,10 @@ static irqreturn_t m2s_irq(int irq, void *dev_id)
     // Just a printk for RX MSG LOST at this point 
     // TODO: more handling
     if (int_status & M2S_INT_RXLOST)
-        printk(KERN_INFO "%s: RX MSG LOST, RX_BUF_STATUS = 0x%08x\n", __func__, rx_buf_status);            
-    
+    {
+        printk(KERN_ERR "%s %s: RX MSG LOST, RX_BUF_STATUS = 0x%08x\n", DRV_NAME, __func__, rx_buf_status);            
+        stats->rx_dropped++;
+    }
     /* ------------------------------------------------------------------------------
      *  Process RX
      * -----------------------------------------------------------------------------*/
@@ -605,7 +921,7 @@ static irqreturn_t m2s_irq(int irq, void *dev_id)
         val = readl(&M2S_CAN_REG(prv)->int_en);
         writel(val & ~(M2S_INT_RXMSG | M2S_INT_RXLOST), &M2S_CAN_REG(prv)->int_en);
         
-        printk(KERN_INFO "%s: Scheduling napi, RX_BUF_STATUS = 0x%08x\n", __func__, rx_buf_status);
+        printk(KERN_INFO "%s %s: Scheduling napi, RX_BUF_STATUS = 0x%08x\n", DRV_NAME, __func__, rx_buf_status);
         napi_schedule(&prv->napi); 
     }     
     else    
@@ -667,7 +983,7 @@ no_receive:
         {
             if (txb & M2S_CAN_TXRQ) // Safety check, txb must not be changed while TxReq is 1
             {
-                printk(KERN_INFO "%s: ERROR! Mailbox buffer status is STILL pending TXB[%d] = 0x%08X\n", __func__, mb, txb);
+                printk(KERN_ERR "%s %s: ERROR! Mailbox buffer status is STILL pending TXB[%d] = 0x%08X\n", DRV_NAME, __func__, mb, txb);
                 continue;
             }
             CDBG(KERN_INFO "%s: TXB for mb[%d] =  0x%08x", __func__, mb, txb);
@@ -698,34 +1014,12 @@ no_xmit:
     /*
      * Handle errors 
      */ 
-    if (int_status & M2S_INT_ERRS)
-    {
-        if (int_status & M2S_INT_BUSOFF)
-            printk(KERN_INFO "%s: The CAN controller entered the bus-off error state\n", __func__);
-        if (int_status & M2S_INT_CRCERR)
-            printk(KERN_INFO "%s: A CAN CRC error was detected\n", __func__);
-        if (int_status & M2S_INT_FORMERR)
-            printk(KERN_INFO "%s: A CAN format error was detectedt\n", __func__);        
-        if (int_status & M2S_INT_ACKERR)
-            printk(KERN_INFO "%s: A CAN message acknowledgement error was detected\n", __func__);     
-        if (int_status & M2S_INT_STUFFERR)
-            printk(KERN_INFO "%s: A CAN bit stuffing error is detected\n", __func__);
-        if (int_status & M2S_INT_BITERR)
-            printk(KERN_INFO "%s: A CAN bit error is detected\n", __func__);        
-        if (int_status & M2S_INT_OVRLOAD)
-            printk(KERN_INFO "%s: A CAN overload message is detected\n", __func__);        
-        if (int_status & M2S_INT_ARBLOSS)
-            printk(KERN_INFO "%s: Message arbitration was lost while sending a message\n", __func__);                
-    }
-    
-    
-    if (int_status & M2S_INT_SSTFAIL)
-        printk(KERN_INFO "%s: A buffer set for single shot transmission experienced an arbitration loss or a bus error during transmission\n", __func__);
-    if (int_status & M2S_INT_STUCK)
-        printk(KERN_INFO "%s: Stuck at dominant error, RX input remains stuck at 0 for more than 11 consecutive bit times\n", __func__);
-    if (int_status & M2S_INT_RTR)
-        printk(KERN_INFO "%s: A RTR auto-reply message was sent\n", __func__);
+	//
+	if (int_status & M2S_INT_ERRS)
+	{
         
+		m2s_error_handling(ndev, int_status);
+	}
 
     return IRQ_HANDLED;
 }
@@ -920,14 +1214,14 @@ static netdev_tx_t m2s_start_xmit(struct sk_buff *skb, struct net_device *ndev)
      */
 	if (!(mb < CAN_TX_MAILBOX)) 
     {
-        printk(KERN_INFO "%s: TX BUF STATUS = 0x%08x\n", __func__, readl(&M2S_CAN_REG(prv)->tx_buf_status));
-        printk(KERN_INFO "%s: TX ID 0x%X failed to send = 0x%08x 0x%08x\n", __func__, cf->can_id, *(u32 *)(cf->data), *(u32 *)(cf->data+4));
+        printk(KERN_ERR "%s %s: TX BUF STATUS = 0x%08x\n", DRV_NAME, __func__, readl(&M2S_CAN_REG(prv)->tx_buf_status));
+        printk(KERN_ERR "%s %s: TX ID 0x%X failed to send = 0x%08x 0x%08x\n", DRV_NAME, __func__, cf->can_id, *(u32 *)(cf->data), *(u32 *)(cf->data+4));
 		rv = NETDEV_TX_BUSY;
         
         // All buffers occupied - transmit resources unavailable
         // Stop upper layers from calling the hard_start_xmit routine
         netif_stop_queue(ndev);
-        printk("%s: Error, NETDEV_TX_BUSY", __func__);
+        printk(KERN_ERR "%s %s: Error, NETDEV_TX_BUSY", DRV_NAME, __func__);
 		goto out;
 	}
 
@@ -1025,7 +1319,7 @@ static int m2s_poll(struct napi_struct *napi, int quota)
             return 0;
         
         // Read RX mailbox status register 
-        printk(KERN_INFO "%s: RX BUF STATUS = 0x%08x\n", __func__, readl(&M2S_CAN_REG(prv)->rx_buf_status));    
+        CDBG(KERN_INFO "%s: RX BUF STATUS = 0x%08x\n", __func__, readl(&M2S_CAN_REG(prv)->rx_buf_status));    
  		i = done = 0;
         
  		// iterate through mailboxes and check if any messages available 
@@ -1126,7 +1420,7 @@ static int __init m2s_can_probe(struct platform_device *pdev)
 		rv = -ENODEV;
 		goto out;
 	}    
-    printk(KERN_INFO "%s: irq=%08x; res->start=%08x sizeof(regs)=%08x resource_size=%08x\n", __func__, 
+    printk(KERN_INFO "%s %s: irq=%08x; res->start=%08x sizeof(regs)=%08x resource_size=%08x\n", DRV_NAME, __func__, 
         irq, res->start,sizeof(struct m2s_can_cfg_regs), resource_size(res));
     
 	if (!request_mem_region(res->start,
@@ -1243,7 +1537,7 @@ static struct platform_driver m2s_can_driver = {
     printk(KERN_INFO "%s netdevice driver\n", DRV_NAME);
 	ret = platform_driver_register(&m2s_can_driver);
 	if (ret < 0) {
-		printk(KERN_ALERT "%s: registering device %s with major %d "
+		printk(KERN_ERR "%s: registering device %s with major %d "
 				  "failed with %d\n",
 		       __func__, DRV_NAME, dev_major, ret);
 		goto Done;
