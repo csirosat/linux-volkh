@@ -529,7 +529,9 @@ static void m2s_error_state(struct net_device *ndev, struct can_frame *cf, enum 
 			prv->can.can_stats.restarts++;
 			
 			netif_carrier_on(ndev);
-			netif_wake_queue(ndev);
+			
+			if (netif_queue_stopped(ndev))
+				netif_wake_queue(ndev);
 			
 			// re-enable interrupts 
 			val = readl(&M2S_CAN_REG(prv)->int_en);
@@ -573,7 +575,7 @@ static void m2s_error_state(struct net_device *ndev, struct can_frame *cf, enum 
 }
 
 /* Handle the error interrupts and generate error CAN frames */ 
-static int m2s_error_handling(struct net_device *ndev, u32 int_status)
+static int m2s_error_handling(struct net_device *ndev, u32 int_status, unsigned int tx_overflow, unsigned int rx_overflow)
 {
     struct net_device_stats *stats = &ndev->stats;
     struct m2s_can_dev *prv = netdev_priv(ndev);
@@ -635,7 +637,19 @@ static int m2s_error_handling(struct net_device *ndev, u32 int_status)
 					new_state = prv->can.state;
 		}
 	}
-		
+	
+	if (tx_overflow)
+	{
+		error_class |= CAN_ERR_CRTL;
+		error_code |= CAN_ERR_CRTL_TX_OVERFLOW; 
+	}
+	
+	if (rx_overflow)
+	{
+		error_class |= CAN_ERR_CRTL;
+		error_code |= CAN_ERR_CRTL_RX_OVERFLOW; 		
+	}
+	
 	// Set error codes for error CAN frames 
 	if (int_status & M2S_INT_BUSOFF)
 	{
@@ -759,7 +773,7 @@ static int m2s_error_handling(struct net_device *ndev, u32 int_status)
     cf = (struct can_frame *)skb_put(skb, sizeof(struct can_frame));
 	
 	cf->can_id = CAN_ERR_FLAG | error_class;
-	// cf->can_id |= error_class;
+
 	*(u32 *)(cf->data + 0) = 0;
 	*(u32 *)(cf->data + 4) = error_code;  
 
@@ -951,6 +965,10 @@ static irqreturn_t m2s_irq(int irq, void *dev_id)
                 
                 // update status of receive mailboxes
                 rx_buf_status = readl(&M2S_CAN_REG(prv)->rx_buf_status);
+				
+				if (rx_buf_status == 0xFFFFFFFF) // rx_overflow 
+					m2s_error_handling(ndev, 0, 0, 1);  
+					
             }
             mb++;
         }    
@@ -1002,7 +1020,7 @@ no_receive:
     // if transmit buffer is cleared and queue buffer was stopped, restart queue
     // Able to accept packets for transmission again:
     val = readl(&M2S_CAN_REG(prv)->tx_buf_status);
-    if (val == 0)
+    if (val == 0 && netif_queue_stopped(ndev))
         netif_wake_queue(ndev);
     
     // if no other active interrupts
@@ -1018,7 +1036,7 @@ no_xmit:
 	if (int_status & M2S_INT_ERRS)
 	{
         
-		m2s_error_handling(ndev, int_status);
+		m2s_error_handling(ndev, int_status, 0, 0);
 	}
 
     return IRQ_HANDLED;
@@ -1222,6 +1240,10 @@ static netdev_tx_t m2s_start_xmit(struct sk_buff *skb, struct net_device *ndev)
         // Stop upper layers from calling the hard_start_xmit routine
         netif_stop_queue(ndev);
         printk(KERN_ERR "%s %s: Error, NETDEV_TX_BUSY", DRV_NAME, __func__);
+		
+		// generate tx overflow error frame 
+		m2s_error_handling(ndev, 0, 1, 0);
+		
 		goto out;
 	}
 
