@@ -34,6 +34,7 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/mm_inline.h> /* for page_is_file_cache() */
+#include <linux/sysctl.h>
 #include "internal.h"
 
 /*
@@ -109,6 +110,66 @@
  *  ->tasklist_lock             (memory_failure, collect_procs_ao)
  *    ->i_mmap_lock
  */
+
+/*
+ * Start release pagecache (via kswapd) at the percentage.
+ */
+int pagecache_ratio __read_mostly = 90;
+
+unsigned int pagecache_limit = 0;
+
+#define PAGECACHE_RECLAIM_THRESHOLD 64 /* Call reclaim after exceeding
+					  the limit by this threshold */
+
+int setup_pagecache_limit(void)
+{
+	if (pagecache_ratio > 100)
+		pagecache_ratio = 100;
+	if (pagecache_ratio < 5)
+		pagecache_ratio = 5;
+	pagecache_limit = pagecache_ratio * nr_free_pagecache_pages() / 100;
+	return 0;
+}
+
+int pagecache_ratio_sysctl_handler(ctl_table *table, int write,
+	void __user *buffer, size_t *length, loff_t *ppos)
+{
+	proc_dointvec_minmax(table, write, buffer, length, ppos);
+	setup_pagecache_limit();
+	return 0;
+}
+
+extern unsigned long shrink_all_pagecache_memory(unsigned long nr_pages);
+
+int check_pagecache_overlimit(void)
+{
+	unsigned long current_pagecache;
+	int nr_pages = 0;
+
+	current_pagecache = global_page_state(NR_FILE_PAGES) -
+		global_page_state(NR_FILE_MAPPED);
+	/* NR_FILE_PAGES includes shared memory, swap cache and
+	 * buffers.  Hence exclude NR_FILE_MAPPED, since we would
+	 * not reclaim mapped pages.  Unmapped pagecache pages
+	 * is what we really want to target */
+	if ( pagecache_limit && current_pagecache > pagecache_limit)
+		nr_pages = current_pagecache - pagecache_limit;
+
+	return nr_pages;
+}
+
+static inline int balance_pagecache(void)
+{
+	unsigned long nr_pages;
+	unsigned long ret;
+	nr_pages = check_pagecache_overlimit();
+	/* Don't call reclaim for each page */
+	if (nr_pages > PAGECACHE_RECLAIM_THRESHOLD)
+		ret = shrink_all_pagecache_memory(nr_pages);
+	return 0;
+}
+
+__initcall(setup_pagecache_limit);
 
 /*
  * Remove a page from the page cache and free it. Caller has to make
@@ -1168,6 +1229,8 @@ out:
 
 	*ppos = ((loff_t)index << PAGE_CACHE_SHIFT) + offset;
 	file_accessed(filp);
+
+	balance_pagecache();
 }
 
 int file_read_actor(read_descriptor_t *desc, struct page *page,
@@ -2288,8 +2351,10 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 	if (likely(status >= 0)) {
 		written += status;
 		*ppos = pos + status;
-  	}
-	
+	}
+
+	balance_pagecache();
+
 	return written ? written : status;
 }
 EXPORT_SYMBOL(generic_file_buffered_write);

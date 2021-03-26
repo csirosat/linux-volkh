@@ -48,6 +48,8 @@
 
 #include "internal.h"
 
+extern int check_pagecache_overlimit(void);
+
 struct scan_control {
 	/* Incremented by the number of inactive pages that were scanned */
 	unsigned long nr_scanned;
@@ -74,6 +76,9 @@ struct scan_control {
 	int swappiness;
 
 	int all_unreclaimable;
+
+	int reclaim_pagecache_only;  /* Set when called from
+					pagecache controller */
 
 	int order;
 
@@ -611,6 +616,15 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		VM_BUG_ON(PageActive(page));
 
+		/* Take it easy if we are doing only pagecache pages */
+		if (sc->reclaim_pagecache_only) {
+			/* Check if this is a pagecache page they are not mapped */
+			if (page_mapped(page))
+				goto keep_locked;
+			/* Check if pagecache limit is exceeded */
+			if (!check_pagecache_overlimit())
+				goto keep_locked;
+		}
 		sc->nr_scanned++;
 
 		if (unlikely(!page_evictable(page, NULL)))
@@ -685,7 +699,9 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		}
 
 		if (PageDirty(page)) {
-			if (sc->order <= PAGE_ALLOC_COSTLY_ORDER && referenced)
+			/* Reclaim even referenced pagecache pages if over limit */
+			if (!check_pagecache_overlimit()
+			&& sc->order <= PAGE_ALLOC_COSTLY_ORDER && referenced)
 				goto keep_locked;
 			if (!may_enter_fs)
 				goto keep_locked;
@@ -1344,6 +1360,13 @@ static void shrink_active_list(unsigned long nr_pages, struct zone *zone,
 		cond_resched();
 		page = lru_to_page(&l_hold);
 		list_del(&page->lru);
+		/* While reclaiming pagecache make it easy */
+		if (sc->reclaim_pagecache_only) {
+			if (page_mapped(page) || !check_pagecache_overlimit()) {
+				list_add(&page->lru, &l_active);
+				continue;
+			}
+		}
 
 		if (unlikely(!page_evictable(page, NULL))) {
 			putback_lru_page(page);
@@ -1621,14 +1644,6 @@ static void shrink_zone(int priority, struct zone *zone,
 					  &reclaim_stat->nr_saved_scan[l]);
 	}
 
-	/*
-	 * If the page cache is too big then focus on page cache
-	 * and ignore anonymous pages
-	 */
-	if (sc->may_swap && zone_page_state(zone, NR_FILE_PAGES)
-			> zone->max_pagecache_pages)
-		sc->may_swap = 0;
-
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
 					nr[LRU_INACTIVE_FILE]) {
 		for_each_evictable_lru(l) {
@@ -1850,6 +1865,7 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 		.mem_cgroup = NULL,
 		.isolate_pages = isolate_pages_global,
 		.nodemask = nodemask,
+		.reclaim_pagecache_only = 0,
 	};
 
 	return do_try_to_free_pages(zonelist, &sc);
@@ -1982,6 +1998,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order)
 		.order = order,
 		.mem_cgroup = NULL,
 		.isolate_pages = isolate_pages_global,
+		.reclaim_pagecache_only = 0,
 	};
 	/*
 	 * temp_priority is used to remember the scanning priority at which
@@ -2362,6 +2379,7 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 		.swappiness = vm_swappiness,
 		.order = 0,
 		.isolate_pages = isolate_pages_global,
+		.reclaim_pagecache_only = 0,
 	};
 	struct zonelist * zonelist = node_zonelist(numa_node_id(), sc.gfp_mask);
 	struct task_struct *p = current;
@@ -2381,6 +2399,38 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 	return nr_reclaimed;
 }
 #endif /* CONFIG_HIBERNATION */
+
+unsigned long shrink_all_pagecache_memory(unsigned long nr_pages)
+{
+	struct reclaim_state reclaim_state;
+	struct scan_control sc = {
+		.gfp_mask = GFP_HIGHUSER_MOVABLE,
+		.may_swap = 0,
+		.may_unmap = 0,
+		.may_writepage = 1,
+		.nr_to_reclaim = nr_pages,
+		.swappiness = 0,
+		.order = 0,
+		.isolate_pages = isolate_pages_global,
+		.reclaim_pagecache_only = 1,
+	};
+	struct zonelist * zonelist = node_zonelist(numa_node_id(), sc.gfp_mask);
+	struct task_struct *p = current;
+	unsigned long nr_reclaimed;
+
+	p->flags |= PF_MEMALLOC;
+	lockdep_set_current_reclaim_state(sc.gfp_mask);
+	reclaim_state.reclaimed_slab = 0;
+	p->reclaim_state = &reclaim_state;
+
+	nr_reclaimed = do_try_to_free_pages(zonelist, &sc);
+
+	p->reclaim_state = NULL;
+	lockdep_clear_current_reclaim_state();
+	p->flags &= ~PF_MEMALLOC;
+
+	return nr_reclaimed;
+}
 
 /* It's optimal to keep kswapds on the same CPUs as their memory, but
    not required for correctness.  So if the last cpu in a node goes
