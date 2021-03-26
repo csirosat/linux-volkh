@@ -14,6 +14,12 @@
 #include <linux/bitops.h>
 #include <linux/hardirq.h> /* for in_interrupt() */
 
+extern int pagecache_ratio;
+extern unsigned int pagecache_limit;
+
+extern int pagecache_ratio_sysctl_handler(struct ctl_table *, int,
+			void __user *, size_t *, loff_t *);
+
 /*
  * Bits in mapping->flags.  The lower __GFP_BITS_SHIFT bits are the page
  * allocation mode flags.
@@ -210,13 +216,12 @@ static inline struct page *__page_cache_alloc(gfp_t gfp)
 
 static inline struct page *page_cache_alloc(struct address_space *x)
 {
-	return __page_cache_alloc(mapping_gfp_mask(x)| __GFP_PAGECACHE);
+	return __page_cache_alloc(mapping_gfp_mask(x));
 }
 
 static inline struct page *page_cache_alloc_cold(struct address_space *x)
 {
-	return __page_cache_alloc(mapping_gfp_mask(x) |
-			__GFP_COLD | __GFP_PAGECACHE);
+	return __page_cache_alloc(mapping_gfp_mask(x)|__GFP_COLD);
 }
 
 typedef int filler_t(void *, struct page *);

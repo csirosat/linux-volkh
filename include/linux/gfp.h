@@ -52,7 +52,6 @@ struct vm_area_struct;
 #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
 #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
 #define __GFP_RECLAIMABLE ((__force gfp_t)0x80000u) /* Page is reclaimable */
-#define __GFP_PAGECACHE	((__force gfp_t)0x100000u) /* Page cache allocation */
 
 #ifdef CONFIG_KMEMCHECK
 #define __GFP_NOTRACK	((__force gfp_t)0x200000u)  /* Don't track with kmemcheck */

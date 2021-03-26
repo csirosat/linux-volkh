@@ -80,8 +80,6 @@ gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
 int pageblock_order __read_mostly;
 #endif
 
-int sysctl_pagecache_ratio = 100;
-
 static void __free_pages_ok(struct page *page, unsigned int order);
 
 /*
@@ -1538,11 +1536,6 @@ zonelist_scan:
 				continue;
 		if ((alloc_flags & ALLOC_CPUSET) &&
 			!cpuset_zone_allowed_softwall(zone, gfp_mask))
-				goto try_next_zone;
-
-		if ((gfp_mask & __GFP_PAGECACHE) &&
-				zone_page_state(zone, NR_FILE_PAGES) >
-					zone->max_pagecache_pages)
 				goto try_next_zone;
 
 		BUILD_BUG_ON(ALLOC_NO_WATERMARKS < NR_WMARK);
@@ -3851,8 +3844,6 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 						/ 100;
 		zone->min_slab_pages = (realsize * sysctl_min_slab_ratio) / 100;
 #endif
-		zone->max_pagecache_pages =
-			(realsize * sysctl_pagecache_ratio) / 100;
 		zone->name = zone_names[j];
 		spin_lock_init(&zone->lock);
 		spin_lock_init(&zone->lru_lock);
@@ -4785,22 +4776,6 @@ int sysctl_min_slab_ratio_sysctl_handler(ctl_table *table, int write,
 	return 0;
 }
 #endif
-
-int sysctl_pagecache_ratio_sysctl_handler(ctl_table *table, int write,
-	void __user *buffer, size_t *length, loff_t *ppos)
-{
-	struct zone *zone;
-	int rc;
-
-	rc = proc_dointvec_minmax(table, write, buffer, length, ppos);
-	if (rc)
-		return rc;
-
-	for_each_zone(zone)
-		zone->max_pagecache_pages = (zone->present_pages *
-				sysctl_pagecache_ratio) / 100;
-	return 0;
-}
 
 /*
  * lowmem_reserve_ratio_sysctl_handler - just a wrapper around
