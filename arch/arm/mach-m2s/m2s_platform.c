@@ -213,7 +213,8 @@ static void __init m2s_reset_source(void)
 	char * reset_source_str = "UNKNOWN";
 	int i;
 
-	M2S_SYSREG->reset_source_cr = 0;
+	// Don't reset register. Allow userspace to read it first
+	// M2S_SYSREG->reset_source_cr = 0;
 
 	for (i = 0; i < sizeof(m2s_reset_source_lut)/sizeof(char *); i++)
 		if (reset_source == 1<<i) {
